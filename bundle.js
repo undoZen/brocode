@@ -67,7 +67,7 @@ var bundle = Promise.coroutine(function * (fullPath, opts) {
   if (opts.global) {
     return new Buffer(qasSrc + 'QAS.sync(function () { ' + src + '}); QAS.ready()', 'utf-8')
   } else {
-    return new Buffer(qasWrapperHeader + src + qasWrapperFooter + 'if (!document.querySelector("script[bros-global]")) { ' + qasSrc + 'QAS.ready() };', 'utf-8')
+    return new Buffer(qasWrapperHeader + src + qasWrapperFooter + 'if (!document.querySelector("script[brocode-global]")) { ' + qasSrc + 'QAS.ready() };', 'utf-8')
   }
 })
 

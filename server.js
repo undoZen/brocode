@@ -78,12 +78,6 @@ app.get(/.*\.js$/i, function (req, res, next) {
     opts.global = true
   }
 
-  if (opts.global && cache.global) {
-    log('(bundle)', path.sep + path.relative(SRC_ROOT, filePath), 'from cache')
-    send(cache.global)
-    return
-  }
-
   var globalLibsPath = path.join(SRC_ROOT, 'global.libs.json')
   var globalLibs = cache.libs
   if (!globalLibs) {
@@ -104,18 +98,12 @@ app.get(/.*\.js$/i, function (req, res, next) {
       return x[1] || x[0]
     }).filter(Boolean)
   }
-  function send (b) {
-    res.type('js')
-    res.send(b)
-  }
   opts.args = xtend(args, {basedir: SRC_ROOT})
   var start = Date.now()
   var b = (exists) => (exists ? bundle(filePath, opts) : bundle(null, opts)).then(b => {
     log('(bundle)', path.sep + path.relative(SRC_ROOT, filePath), `${Date.now() - start}ms`)
-    if (opts.global) {
-      cache.global = b
-    }
-    send(b)
+    res.type('js')
+    res.send(b)
   })
   fs.exists(filePath, (exists) => {
     if (!exists) {
