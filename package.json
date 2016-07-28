@@ -1,0 +1,58 @@
+{
+  "name": "brocode",
+  "version": "0.0.0",
+  "description": "A Bro doesn't allow another Bro to struggle with web packaging tools.",
+  "main": "bundle.js",
+  "jsnext:main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 0"
+  },
+  "bin": {
+    "brocode": "bin.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@github.com/undoZen/brocode.git"
+  },
+  "author": "undoZen <opensource@undozen.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/undoZen/brocode/issues"
+  },
+  "homepage": "https://github.com/undoZen/brocode",
+  "dependencies": {
+    "babel-core": "^6.8.0",
+    "babel-preset-dysonshell": "^1.2.0",
+    "babelify": "^7.3.0",
+    "bluebird": "^3.4.0",
+    "browser-pack": "^6.0.1",
+    "browser-sync": "^2.12.8",
+    "browserify": "^13.0.1",
+    "browserify-derequire": "^0.9.4",
+    "browserify-hmr": "^0.3.1",
+    "chokidar": "^1.6.0",
+    "connect-gzip-static": "^1.0.0",
+    "ecstatic": "^1.4.1",
+    "envify": "^3.4.1",
+    "event-stream": "^3.3.2",
+    "express": "^4.13.4",
+    "gulp": "^3.9.1",
+    "gulp-cssnano": "^2.1.2",
+    "gulp-if": "^2.0.1",
+    "gulp-insert": "^0.5.0",
+    "gulp-rev-all": "^0.8.24",
+    "gulp-uglify": "^1.5.3",
+    "gulp-util": "^3.0.7",
+    "lodash": "^4.13.1",
+    "lodash.debounce": "^4.0.6",
+    "qas": "^0.4.5",
+    "rollup": "^0.26.3",
+    "rollup-plugin-commonjs": "^3.0.0",
+    "st": "^1.2.0",
+    "stream-combiner": "^0.2.2",
+    "through2": "^2.0.1",
+    "vinyl": "^1.1.1",
+    "xtend": "^4.0.1",
+    "yargs": "^4.8.1"
+  }
+}
