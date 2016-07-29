@@ -126,6 +126,8 @@ app.use(function (req, res, next) {
 })
 
 app.use(st({
+  cache: false,
+  dot: true,
   path: APP_ROOT,
   index: 'index.html'
 }))
