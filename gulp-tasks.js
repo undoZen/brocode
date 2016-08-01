@@ -90,7 +90,7 @@ gulp.task('build', function() {
         })
       }
       opts.args = {basedir: mRoot.replace(/[\/]src$/, '')}
-      bundle(file.path, opts).then(b => {
+      bundle([file.path], [], opts).then(b => {
         file.contents = b
         this.push(file)
         done()
@@ -110,7 +110,7 @@ gulp.task('build', function() {
         return x[1] || x[0]
       }).filter(Boolean)
       opts.args = {basedir: mRoot.replace(/[\/]src$/, '')}
-      bundle(file.path, opts).then(b => {
+      bundle([file.path], [], opts).then(b => {
         file.contents = b
         this.push(file)
         done()
