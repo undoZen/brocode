@@ -53,7 +53,7 @@ function boolOpt(value) {
   return Boolean(value && value !== 'false');
 }
 
-module.exports = function(bundle, opts) {
+module.exports = function(opts) {
   if (!opts) opts = {};
   var updateMode = readOpt(opts, 'mode', 'm', 'websocket');
   if (updateMode === 'xhr') {
@@ -95,89 +95,6 @@ module.exports = function(bundle, opts) {
 
   var useLocalSocketServer = !noServe && _.includes(supportModes, 'websocket');
 
-  var server;
-  var nextServerConfirm = RSVP.defer();
-  var runServer = _.once(function() {
-    server = cproc.fork(__dirname+'/socket-server.js');
-    server.on('message', function(msg) {
-      if (msg.type === 'confirmNewModuleData') {
-        nextServerConfirm.resolve();
-        nextServerConfirm = RSVP.defer();
-      } else {
-        console.warn('[HMR builder] Unknown message type from server:', msg.type);
-      }
-    });
-    server.on('disconnect', function() {
-      em.emit('error', new Error("Browserify-HMR lost connection to socket server"));
-    });
-    return new RSVP.Promise(function(resolve, reject) {
-      var readJobs = [];
-      if (cert) {
-        readJobs.push(readFile(cert, 'utf8').then(function(data) {
-          tlsoptions = tlsoptions || {};
-          tlsoptions.cert = data;
-        }));
-      }
-      if (key) {
-        readJobs.push(readFile(key, 'utf8').then(function(data) {
-          tlsoptions = tlsoptions || {};
-          tlsoptions.key = data;
-        }));
-      }
-      if (readJobs.length) {
-        resolve(RSVP.Promise.all(readJobs));
-      } else {
-        resolve();
-      }
-    }).then(function(){
-      server.send({
-        type: 'config',
-        hostname: hostname,
-        port: port,
-        tlsoptions: tlsoptions
-      });
-    });
-  });
-
-  var currentModuleData = {};
-
-  function setNewModuleData(moduleData) {
-    if (!useLocalSocketServer) {
-      return RSVP.Promise.resolve();
-    }
-    return runServer().then(function() {
-      var newModuleData = _.chain(moduleData)
-        .toPairs()
-        .filter(function(pair) {
-          return pair[1].isNew;
-        })
-        .map(function(pair) {
-          return [pair[0], {
-            index: pair[1].index,
-            hash: pair[1].hash,
-            source: pair[1].source,
-            parents: pair[1].parents,
-            deps: pair[1].deps
-          }];
-        })
-        .fromPairs()
-        .value();
-      var removedModules = _.chain(currentModuleData)
-        .keys()
-        .filter(function(name) {
-          return !has(moduleData, name);
-        })
-        .value();
-      currentModuleData = moduleData;
-      server.send({
-        type: 'setNewModuleData',
-        newModuleData: newModuleData,
-        removedModules: removedModules
-      });
-      return nextServerConfirm.promise;
-    });
-  }
-
   function fileKey(filename) {
     return path.relative(basedir, filename);
   }
@@ -185,9 +102,9 @@ module.exports = function(bundle, opts) {
   var hmrManagerFilename;
 
   // keys are filenames, values are {hash, transformedSource}
-  var transformCache = {};
+  var transformCache = global._hmr.transformCache
 
-  function setupPipelineMods() {
+  function setupPipelineMods(bundle) {
     var originalEntries = [];
     bundle.pipeline.get('record').push(through.obj(function(row, enc, next) {
       if (row.entry) {
@@ -243,7 +160,6 @@ module.exports = function(bundle, opts) {
     }));
 
     var moduleData = {};
-    var newTransformCache = {};
     var managerRow = null;
     var rowBuffer = [];
 
@@ -267,7 +183,6 @@ module.exports = function(bundle, opts) {
         if (has(transformCache, row.file) && transformCache[row.file].hash === hash) {
           isNew = false;
           row.source = transformCache[row.file].transformedSource;
-          newTransformCache[row.file] = transformCache[row.file];
           thunk = _.constant(row);
         } else {
           isNew = true;
@@ -294,7 +209,7 @@ module.exports = function(bundle, opts) {
             var result = node.toStringWithSourceMap();
             row.source = result.code + convert.fromObject(result.map.toJSON()).toComment();
 
-            newTransformCache[row.file] = {
+            transformCache[row.file] = {
               hash: hash,
               transformedSource: row.source
             };
@@ -321,11 +236,9 @@ module.exports = function(bundle, opts) {
       }
     }, function(done) {
       var self = this;
+      bundle.emit('setNewModuleData', moduleData)
 
-      transformCache = newTransformCache;
-      setNewModuleData(moduleData).then(function() {
-        return readManagerTemplate();
-      }).then(function(mgrTemplate) {
+      readManagerTemplate().then(function(mgrTemplate) {
         rowBuffer.forEach(function(thunk) {
           self.push(thunk());
         });
@@ -345,8 +258,8 @@ module.exports = function(bundle, opts) {
       }).then(done, done);
     }));
   }
-  setupPipelineMods();
-
-  bundle.on('reset', setupPipelineMods);
-  return em;
+  return function setup (b) {
+    setupPipelineMods(b);
+    b.on('reset', setupPipelineMods);
+  }
 };

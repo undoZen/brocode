@@ -26,7 +26,7 @@ var args = {
   extensions: ['jsx']
 }
 
-var bundle = Promise.coroutine(function * (fullPath, opts) {
+var bundle = Promise.coroutine(function * (entries, requires, opts) {
   opts = opts || {}
   var b = browserify(xtend(args, opts.args || {}))
   if (opts.args.packageCache) {
@@ -39,8 +39,11 @@ var bundle = Promise.coroutine(function * (fullPath, opts) {
   if (typeof opts.alterb === 'function') {
     opts.alterb(b)
   }
-  if (fullPath) {
-    b.add(fullPath)
+  if (entries && entries.length) {
+    entries.forEach(fullPath => b.add(fullPath))
+  }
+  if (requires && requires.length) {
+    requires.forEach(fullPath => b.require(fullPath))
   }
   if (opts.envify !== false) {
     b.transform(envify, opts.envify || {})
@@ -73,7 +76,9 @@ var bundle = Promise.coroutine(function * (fullPath, opts) {
 
 function alterPipeline (b, opts) {
   opts = opts || {}
-  b.pipeline.get('dedupe').splice(0, 1) // arguments[4] bug
+  if (b.pipeline.get('dedupe') && b.pipeline.get('dedupe').length) {
+    b.pipeline.get('dedupe').splice(0, 1) // arguments[4] bug
+  }
   b.pipeline.get('pack')
     .splice(0, 1, bpack(xtend(args, {
       raw: true,
