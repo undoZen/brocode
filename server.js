@@ -57,9 +57,7 @@ var globalRegExp = /[\\\/]node_modules[\\\/]|[\\\/]src[\\\/]global\.(?:js|libs\.
 var cacheLibs
 function update (onPath) {
   var p = path.resolve(SRC_ROOT, onPath)
-  console.log(_.keys(args.cache));
   var hitCache = !!args.cache[p]
-  console.log(111, p, hitCache);
   delete args.cache[p]
   delete args.packageCache[p]
   delete args.packageCache[p + '/package.json']
@@ -78,7 +76,6 @@ var app = express()
 var log = function () {
   var args = Array.prototype.slice.call(arguments)
   args.unshift((new Date()).toLocaleString())
-  console.log.apply(console, args)
 }
 
 app.use(function (req, res, next) {
@@ -94,7 +91,7 @@ function emitNewModules(socket, moduleData) {
   var newModuleData = _.chain(moduleData)
     .toPairs()
     .filter(function(pair) {
-      return pair[1].isNew;
+      return pair[1].isNew && (!currentModuleData[pair[0]] || currentModuleData[pair[0]].hash !== pair[1].hash)
     })
     .map(function(pair) {
       return [pair[0], {
@@ -113,9 +110,8 @@ function emitNewModules(socket, moduleData) {
       return !has(moduleData, name);
     })
     .value();
-  console.log(Object.keys(newModuleData), removedModules)
+  //console.log(Object.keys(newModuleData), removedModules)
   if (Object.keys(newModuleData).length || removedModules.length) {
-    console.log(newModuleData, removedModules);
     socket.emit('new modules', {newModuleData: newModuleData, removedModules: removedModules});
   }
 }
@@ -171,7 +167,6 @@ app.get(/.*\.js$/i, function (req, res, next) {
     isGlobal = true
   }
   var opts = getOpts(isGlobal, isHmr)
-  console.log(filePath, opts);
 
   var start = Date.now()
   var b = (exists) => (exists ? bundle([filePath], [], opts) : bundle([], [], opts)).then(b => {
@@ -238,23 +233,17 @@ exports.start = function (port) {
     }
     socket.on('sync', function(syncMsg) {
       log('User connected, syncing');
-      console.log(_.keys(cacheModuleData).filter(function(name) {
-        return name.startsWith('js/main/')
-      }))
       var oldModuleData = _.pick(cacheModuleData, _.keys(syncMsg))
       var mainScripts = _.keys(syncMsg).filter(function(name) {
         return name.startsWith('js/main/')
       })
       log('debug mainScripts', mainScripts)
       ;(mainScripts.length
-      ? Promise.reduce(mainScripts.map((name) => path.join(SRC_ROOT, name)), (filePath) => bundle([filePath], [], getOpts(false, true)), null)
+      ? Promise.all(mainScripts.map((name) => bundle([path.join(SRC_ROOT, name)], [], getOpts(false, true))))
       : Promise.resolve([])).then(function (results) {
         socket.moduleData = oldModuleData
         socket.emit('sync confirm', null);
         emitNewModules(socket, cacheModuleData)
-        console.log(_.keys(cacheModuleData).filter(function(name) {
-          return name.startsWith('js/main/')
-        }))
       });
     });
   });
