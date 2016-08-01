@@ -130,7 +130,8 @@ function getOpts(isGlobal, isHmr) {
     } catch (e) {}
     cacheLibs = globalLibs
   }
-  if (opts.global) {
+  if (isGlobal) {
+    opts.global = true
     opts.alterb = function (b) {
       globalLibs.forEach(function (x) {
         b.require(x[0], {expose: x[1] || x[0]})
@@ -147,7 +148,7 @@ function getOpts(isGlobal, isHmr) {
       return x[1] || x[0]
     }).filter(Boolean)
   }
-  opts.args = xtend(args, {basedir: SRC_ROOT}, (isHmr ? {plugin: [hmrPlugin]} : {}))
+  opts.args = xtend(args, {basedir: SRC_ROOT}, (!isGlobal && isHmr ? {plugin: [hmrPlugin]} : {}))
   return opts
 }
 app.get(/.*\.js$/i, function (req, res, next) {

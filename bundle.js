@@ -17,6 +17,13 @@ var qasWrapperHeader = fs.readFileSync(require.resolve('qas/loader-wrapper-heade
 var qasWrapperFooter = fs.readFileSync(require.resolve('qas/loader-wrapper-footer.js'), 'utf-8')
 
 var APP_ROOT = global.APP_ROOT || process.cwd()
+var pkginfo = require(path.join(APP_ROOT, 'package.json'))
+var pkgBabelify
+if (pkginfo.browserify && pkginfo.browserify.transform && pkginfo.browserify.transform.length) {
+  if (pkginfo.browserify.transform.filter(t => t[0] === 'babelify').length) {
+    pkgBabelify = true
+  }
+}
 
 var args = {
   basedir: APP_ROOT,
@@ -48,8 +55,8 @@ var bundle = Promise.coroutine(function * (entries, requires, opts) {
   if (opts.envify !== false) {
     b.transform(envify, opts.envify || {})
   }
-  if (opts.babelify !== false) {
-    var babelifyOpts = xtend(opts.babelify)
+  if (opts.babelify !== false && !pkgBabelify) {
+    var babelifyOpts = xtend({}, opts.babelify)
     if (!babelifyOpts.presets || (Array.isArray(babelifyOpts.presets) && !babelifyOpts.presets.length)) {
       babelifyOpts.presets = [require('babel-preset-dysonshell')]
     }
