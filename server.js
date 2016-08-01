@@ -23,6 +23,7 @@ var watcher = chokidar.watch(SRC_ROOT, {
 
 var bundle = require('./bundle')
 var args = {
+  fullPaths: true,
   cache: {},
   packageCache: {}
 }
