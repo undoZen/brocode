@@ -121,7 +121,7 @@ function syncModules() {
   })
 }
 function getOpts(isGlobal, isHmr) {
-  var opts = {}
+  var opts = { hmr: !!isHmr }
   var globalLibs = cacheLibs
   if (!globalLibs) {
     globalLibs = []

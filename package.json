@@ -23,6 +23,8 @@
   "dependencies": {
     "babel-core": "^6.8.0",
     "babel-preset-dysonshell": "^1.2.0",
+    "babel-preset-react": "^6.11.1",
+    "babel-preset-react-hmre": "^1.1.1",
     "babelify": "^7.3.0",
     "bluebird": "^3.4.0",
     "browser-pack": "^6.0.1",
@@ -47,6 +49,7 @@
     "lodash": "^4.13.1",
     "lodash.debounce": "^4.0.6",
     "qas": "^0.4.5",
+    "react": "^15.3.0",
     "rollup": "^0.26.3",
     "rollup-plugin-commonjs": "^3.0.0",
     "rsvp": "^3.0.21",

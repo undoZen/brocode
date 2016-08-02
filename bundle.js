@@ -58,7 +58,10 @@ var bundle = Promise.coroutine(function * (entries, requires, opts) {
   if (opts.babelify !== false && !pkgBabelify) {
     var babelifyOpts = xtend({}, opts.babelify)
     if (!babelifyOpts.presets || (Array.isArray(babelifyOpts.presets) && !babelifyOpts.presets.length)) {
-      babelifyOpts.presets = [require('babel-preset-dysonshell')]
+      babelifyOpts.presets = [require('babel-preset-dysonshell'), require('babel-preset-react')]
+      if (opts.hmr) {
+        babelifyOpts.presets.push(require('babel-preset-react-hmre'))
+      }
     }
     if (!babelifyOpts.ignore || (Array.isArray(babelifyOpts.ignore) && !babelifyOpts.ignore.length)) {
       babelifyOpts.ignore = /[\\\/]node_modules[\\\/]/
