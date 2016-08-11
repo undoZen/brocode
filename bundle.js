@@ -11,6 +11,7 @@ var xtend = require('xtend')
 var bpack = require('browser-pack')
 process.env.NODE_ENV = process.env.NODE_ENV || 'development'
 var envify = require('envify/custom')
+var uglifyify = require('uglifyify')
 
 var qasSrc = fs.readFileSync(require.resolve('qas/qas.min.js'), 'utf-8')
 var qasWrapperHeader = fs.readFileSync(require.resolve('qas/loader-wrapper-header.js'), 'utf-8')
@@ -25,8 +26,10 @@ if (pkginfo.browserify && pkginfo.browserify.transform && pkginfo.browserify.tra
   }
 }
 
+var isDev = process.env.NODE_ENV === 'development'
+
 var args = {
-  debug: process.env.NODE_ENV,
+  debug: isDev,
   basedir: APP_ROOT,
   paths: ['.'],
   cache: {},
@@ -53,12 +56,6 @@ var bundle = Promise.coroutine(function * (entries, requires, opts) {
   if (requires && requires.length) {
     requires.forEach(fullPath => b.require(fullPath))
   }
-  if (opts.envify !== false) {
-    b.transform(envify(opts.envify || {
-      _: 'purge',
-      NODE_ENV: process.env.NODE_ENV
-    }))
-  }
   if (opts.babelify !== false && !pkgBabelify) {
     var babelifyOpts = xtend({}, opts.babelify)
     if (!babelifyOpts.presets || (Array.isArray(babelifyOpts.presets) && !babelifyOpts.presets.length)) {
@@ -72,8 +69,17 @@ var bundle = Promise.coroutine(function * (entries, requires, opts) {
     }
     b.transform(babelify, babelifyOpts)
   }
+  if (opts.envify !== false) {
+    b.transform(envify(opts.envify || {
+      _: 'purge',
+      NODE_ENV: process.env.NODE_ENV
+    }))
+  }
   if (opts.transforms) {
     b.transform(opts.transforms)
+  }
+  if (opts.uglifyify !== false && !isDev) {
+    b.transform(uglifyify, {exts: ['.js', '.jsx']})
   }
   if (opts.externals && !opts.global) {
     if (opts.externals) {
