@@ -55,27 +55,65 @@ var reload = debounce(function () {
 }, 300)
 var globalRegExp = /[\\\/]node_modules[\\\/]|[\\\/]src[\\\/]global\.(?:js|libs\.json)$/
 var cacheLibs
+function findAffectedJs(affectsMap, updatedFiles) {
+  if (!Array.isArray(updatedFiles)) {
+    updatedFiles = [updatedFiles]
+  }
+  var jsReg = /\.jsx?$/i
+  if (_.every(updatedFiles, f => jsReg.test(f))) {
+    return updatedFiles
+  }
+  return Array.prototype.concat.apply(
+    updatedFiles.filter(f => jsReg.test(f)),
+    updatedFiles.filter(f => !jsReg.test(f)).map(f => affectsMap[f])
+  )
+}
 function update (onPath) {
   var p = path.resolve(SRC_ROOT, onPath)
   var hitCache = !!args.cache[p]
-  delete args.cache[p]
-  delete args.packageCache[p]
-  delete args.packageCache[p + '/package.json']
-  delete args.packageCache[p + '\\package.json']
   var matchGlobal = p.match(globalRegExp)
   if (matchGlobal) {
     cacheLibs = void 0
-  }
-  if (!matchGlobal && hitCache) {
-    bundle([], [p], getOpts(false, true))
+  } else if (hitCache) {
+    var updatedFiles = [p]
+    var affects = {}
+    var ignoreRegExp = /[\\\/]__hmr_manager.js$|\/brocode\/node_modules\//
+    _.each(args.cache, function (row, id) {
+      _.each(row.deps, function (dep) {
+        var af = affects[dep] || (affects[dep] = [])
+        if (!ignoreRegExp.test(dep) && !ignoreRegExp.test(id)) {
+          af.push(id)
+        }
+      })
+    })
+    var affectedFiles = findAffectedJs(affects, p)
+    delete args.cache[p]
+    delete args.packageCache[p]
+    delete args.packageCache[p + '/package.json']
+    delete args.packageCache[p + '\\package.json']
+    var af = affectedFiles
+      .filter(p => /\.jsx?$/.test(p))
+      .filter(p => !(/\/js\/main\//.test(p)))
+      .filter(p => fs.existsSync(p))
+    if (p.indexOf('/js/main/') > -1) {
+      af.push(p)
+    }
+    if (af.length) {
+      log('(update)', af, 'starting...')
+      var start = Date.now()
+      bundle([], af, getOpts(false, true)).then(function () {
+        log('(update)', af, `${Date.now() - start}ms`)
+      })
+    }
   }
   reload()
 }
 
 var app = express()
-var log = function () {
+function log () {
   var args = Array.prototype.slice.call(arguments)
-  args.unshift((new Date()).toLocaleString())
+  args.unshift((new Date()).toTimeString())
+  console.log.apply(console, args)
 }
 
 app.use(function (req, res, next) {
@@ -104,14 +142,15 @@ function emitNewModules(socket, moduleData) {
     })
     .fromPairs()
     .value();
+  _.assign(socket.moduleData, newModuleData)
   var removedModules = _.chain(currentModuleData)
     .keys()
     .filter(function(name) {
       return !has(moduleData, name);
     })
     .value();
-  //console.log(Object.keys(newModuleData), removedModules)
   if (Object.keys(newModuleData).length || removedModules.length) {
+    log('[HMR]', 'Emitting updates');
     socket.emit('new modules', {newModuleData: newModuleData, removedModules: removedModules});
   }
 }
@@ -169,6 +208,7 @@ app.get(/.*\.js$/i, function (req, res, next) {
   }
   var opts = getOpts(isGlobal, isHmr)
 
+  log('(bundle)', path.sep + path.relative(SRC_ROOT, filePath), `starting...`)
   var start = Date.now()
   var b = (exists) => (exists ? bundle([filePath], [], opts) : bundle([], [], opts)).then(b => {
     log('(bundle)', path.sep + path.relative(SRC_ROOT, filePath), `${Date.now() - start}ms`)
@@ -209,17 +249,6 @@ Object.defineProperty(exports, 'io', {
   }
 })
 
-function setNewModuleData(newModuleData, removedModules) {
-  _.assign(currentModuleData, newModuleData);
-  removedModules.forEach(function(name) {
-    delete currentModuleData[name];
-  });
-  if (Object.keys(newModuleData).length || removedModules.length) {
-    log('Emitting updates');
-    io.emit('new modules', {newModuleData: newModuleData, removedModules: removedModules});
-  }
-}
-
 exports.app = app
 exports.start = function (port) {
   port = port || 8000
@@ -238,10 +267,12 @@ exports.start = function (port) {
       var mainScripts = _.keys(syncMsg).filter(function(name) {
         return name.startsWith('js/main/')
       })
-      log('debug mainScripts', mainScripts)
+      log('(sync)', mainScripts, 'starting...')
+      var start = Date.now()
       ;(mainScripts.length
       ? Promise.all(mainScripts.map((name) => bundle([path.join(SRC_ROOT, name)], [], getOpts(false, true))))
       : Promise.resolve([])).then(function (results) {
+        log('(sync)', mainScripts, `${Date.now() - start}ms`)
         socket.moduleData = oldModuleData
         socket.emit('sync confirm', null);
         emitNewModules(socket, cacheModuleData)

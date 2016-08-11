@@ -10,7 +10,7 @@ var babelify = require('babelify')
 var xtend = require('xtend')
 var bpack = require('browser-pack')
 process.env.NODE_ENV = process.env.NODE_ENV || 'development'
-var envify = require('envify')
+var envify = require('envify/custom')
 
 var qasSrc = fs.readFileSync(require.resolve('qas/qas.min.js'), 'utf-8')
 var qasWrapperHeader = fs.readFileSync(require.resolve('qas/loader-wrapper-header.js'), 'utf-8')
@@ -26,6 +26,7 @@ if (pkginfo.browserify && pkginfo.browserify.transform && pkginfo.browserify.tra
 }
 
 var args = {
+  debug: process.env.NODE_ENV,
   basedir: APP_ROOT,
   paths: ['.'],
   cache: {},
@@ -53,7 +54,10 @@ var bundle = Promise.coroutine(function * (entries, requires, opts) {
     requires.forEach(fullPath => b.require(fullPath))
   }
   if (opts.envify !== false) {
-    b.transform(envify, opts.envify || {})
+    b.transform(envify(opts.envify || {
+      _: 'purge',
+      NODE_ENV: process.env.NODE_ENV
+    }))
   }
   if (opts.babelify !== false && !pkgBabelify) {
     var babelifyOpts = xtend({}, opts.babelify)

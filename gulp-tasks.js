@@ -1,5 +1,7 @@
 'use strict';
 
+process.env.NODE_ENV = process.env.NODE_ENV || 'production'
+
 var path = require('path')
 var fs = require('fs');
 
