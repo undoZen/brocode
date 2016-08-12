@@ -32,7 +32,7 @@ var revAll = RevAll({
   dontRenameFile: [/\.html$/],
   replacer: function(fragment, re, nr, file) {
     fragment.contents = fragment.contents.replace(re, function(a, p1, p2, p3, p4) {
-      if (p3 !== ".html" && (p2[0] === '.' || p2[0] === '/' || (p2 === "global" && p3 === ".js"))) {
+      if (p3 && p3 !== ".html") {
         return p1 + nr + p3 + p4
       } else {
         return a
