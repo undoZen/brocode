@@ -1,7 +1,5 @@
 'use strict';
 
-process.env.NODE_ENV = process.env.NODE_ENV || 'production'
-
 var path = require('path')
 var fs = require('fs');
 
@@ -19,6 +17,8 @@ var RevAll = require('gulp-rev-all')
 var nano = require('gulp-cssnano');
 
 var bundle = require('./bundle')
+
+var dist = (global.broCliArgv || {}).dist || process.env.BUILD_DIST || '.dist'
 
 var APP_ROOT = process.cwd()
 var arparts = APP_ROOT.split(path.sep)
@@ -122,7 +122,7 @@ gulp.task('build', function() {
     .pipe(revAll.revision())
     .pipe(gulpif(function (file) {
       return /\.js$/i.test(file.path) && !(/\.min\.[a-f0-9]{8}\.js$/i.test(file.path)) &&
-        ((/^\/fakeSrcRoot\/global\.[a-f0-9]{8}\.js$/i.test(file.path)) || file.path.match(/\/js\/(main|raw|dist)\//))
+        ((/^\/fakeSrcRoot\/global\.[a-f0-9]{8}\.js$/i.test(file.path)) || file.path.match(/\/js\/(main|raw)\//))
     }, uglify({
       compress: {
         drop_console: true

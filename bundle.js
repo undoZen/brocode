@@ -9,7 +9,6 @@ var Promise = require('bluebird')
 var babelify = require('babelify')
 var xtend = require('xtend')
 var bpack = require('browser-pack')
-process.env.NODE_ENV = process.env.NODE_ENV || 'development'
 var envify = require('envify/custom')
 var uglifyify = require('uglifyify')
 
@@ -26,7 +25,8 @@ if (pkginfo.browserify && pkginfo.browserify.transform && pkginfo.browserify.tra
   }
 }
 
-var isDev = process.env.NODE_ENV === 'development'
+var env = process.env.NODE_ENV || 'development'
+var isDev = env === 'development'
 
 var args = {
   debug: isDev,
@@ -72,7 +72,7 @@ var bundle = Promise.coroutine(function * (entries, requires, opts) {
   if (opts.envify !== false) {
     b.transform(envify(opts.envify || {
       _: 'purge',
-      NODE_ENV: process.env.NODE_ENV
+      NODE_ENV: env
     }))
   }
   if (opts.transforms) {
