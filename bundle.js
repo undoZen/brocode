@@ -37,7 +37,7 @@ var args = {
   extensions: ['jsx']
 }
 
-var bundle = Promise.coroutine(function * (entries, requires, opts) {
+var bundle = function (entries, requires, opts) {
   opts = opts || {}
   var b = browserify(xtend(args, opts.args || {}))
   if (opts.args.packageCache) {
@@ -86,13 +86,20 @@ var bundle = Promise.coroutine(function * (entries, requires, opts) {
       b.external(opts.externals)
     }
   }
-  var src = yield bundlePromise(b)
-  if (opts.global) {
-    return new Buffer(qasSrc + 'QAS.sync(function () { ' + src + '}); QAS.ready()', 'utf-8')
-  } else {
-    return new Buffer(qasWrapperHeader + src + qasWrapperFooter + 'if (!document.querySelector("script[brocode-global]")) { ' + qasSrc + 'QAS.ready() };', 'utf-8')
-  }
-})
+  return bundlePromise(b).then(src => {
+    if (opts.global) {
+      return new Buffer(qasSrc + 'QAS.sync(function () { ' + src + '}); QAS.ready()', 'utf-8')
+    } else {
+      return new Buffer(qasWrapperHeader + src + qasWrapperFooter + 'if (!document.querySelector("script[brocode-global]")) { ' + qasSrc + 'QAS.ready() };', 'utf-8')
+    }
+  }).catch(err => {
+    if (err._babel) {
+      console.error(err.message);
+      console.error(err.codeFrame);
+    }
+    throw err
+  })
+}
 
 function alterPipeline (b, opts) {
   opts = opts || {}
@@ -122,7 +129,7 @@ function alterPipeline (b, opts) {
 
 function bundlePromise (b) { // because b.bundle checks arity :(
   return new Promise(function (resolve, reject) {
-    b.bundle(function (err, src) {
+    return b.bundle(function (err, src) {
       if (err) {
         return reject(err)
       }
