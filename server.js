@@ -54,23 +54,24 @@ var reload = debounce(function () {
   }
 }, 300)
 var globalRegExp = /[\\\/]node_modules[\\\/]|[\\\/]src[\\\/]global\.(?:js|libs\.json)$/
+var hmrModuleReg = /\.(jsx?|vue)$/i
 var cacheLibs
-function findAffectedJs(affectsMap, updatedFiles) {
+function findAffectedModule(affectsMap, updatedFiles) {
   if (!Array.isArray(updatedFiles)) {
     updatedFiles = [updatedFiles]
   }
-  var jsReg = /\.jsx?$/i
-  if (_.every(updatedFiles, f => jsReg.test(f))) {
+  if (_.every(updatedFiles, f => hmrModuleReg.test(f))) {
     return updatedFiles
   }
   return Array.prototype.concat.apply(
-    updatedFiles.filter(f => jsReg.test(f)),
-    updatedFiles.filter(f => !jsReg.test(f)).map(f => affectsMap[f])
+    updatedFiles.filter(f => hmrModuleReg.test(f)),
+    updatedFiles.filter(f => !hmrModuleReg.test(f)).map(f => affectsMap[f])
   )
 }
 function update (onPath) {
   var p = path.resolve(SRC_ROOT, onPath)
   var hitCache = !!args.cache[p]
+  console.log('hitCache', p, hitCache);
   var matchGlobal = p.match(globalRegExp)
   if (matchGlobal) {
     cacheLibs = void 0
@@ -86,13 +87,13 @@ function update (onPath) {
         }
       })
     })
-    var affectedFiles = findAffectedJs(affects, p)
+    var affectedFiles = findAffectedModule(affects, p)
     delete args.cache[p]
     delete args.packageCache[p]
     delete args.packageCache[p + '/package.json']
     delete args.packageCache[p + '\\package.json']
     var af = affectedFiles
-      .filter(p => /\.jsx?$/.test(p))
+      .filter(p => hmrModuleReg.test(p))
       .filter(p => !(/\/js\/main\//.test(p)))
       .filter(p => fs.existsSync(p))
     if (p.indexOf('/js/main/') > -1) {

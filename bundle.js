@@ -24,6 +24,22 @@ if (pkginfo.browserify && pkginfo.browserify.transform && pkginfo.browserify.tra
     pkgBabelify = true
   }
 }
+var reactBeUsed
+if ((pkginfo.dependencies || {})['react'] || (pkginfo.devDependencies || {})['react']) {
+  reactBeUsed = true
+}
+var vueBeUsed = (function () {
+  var m, version
+  if ( (version = (pkginfo.dependencies || {})['vue'] || (pkginfo.devDependencies || {})['vue']) ) {
+    if ( !(m = /\d/.exec(version)) ) {
+      return false
+    }
+    if (m[0] === '1' || m[0] === '2') {
+      return m[0]
+    }
+  }
+  return false
+}())
 
 var env = process.env.NODE_ENV || 'development'
 var isDev = env === 'development'
@@ -36,10 +52,64 @@ var args = {
   packageCache: {},
   extensions: ['jsx']
 }
+function useBabelRc () {
+  var babelRcPath = path.resolve(process.cwd(), '.babelrc')
+  if (!fs.existsSync(babelRcPath)) {
+    return false
+  }
+  var rc
+  try {
+    rc = JSON.parse(fs.readFileSync(babelRcPath, 'utf-8'))
+  } catch (e) {
+    throw new Error('[vueify] Your .babelrc seems to be incorrectly formatted.')
+  }
+  return !!rc
+}
 
 var bundle = function (entries, requires, opts) {
   opts = opts || {}
-  var b = browserify(xtend(args, opts.args || {}))
+  var bopts = xtend(args, opts.args || {})
+  var babelifyOpts
+  if (opts.babelify !== false && !pkgBabelify) {
+    babelifyOpts = xtend({}, opts.babelify)
+    if (!babelifyOpts.presets || (Array.isArray(babelifyOpts.presets) && !babelifyOpts.presets.length)) {
+      babelifyOpts.presets = [require('babel-preset-dysonshell')]
+      if (reactBeUsed) {
+        babelifyOpts.presets.push(require('babel-preset-react'))
+        if (opts.hmr) {
+          babelifyOpts.presets.push(require('babel-preset-react-hmre'))
+        }
+      }
+    }
+    if (!babelifyOpts.ignore || (Array.isArray(babelifyOpts.ignore) && !babelifyOpts.ignore.length)) {
+      babelifyOpts.ignore = /[\\\/]node_modules[\\\/]/
+    }
+  }
+  if (vueBeUsed) {
+    var vueify
+    babelifyOpts.presets = babelifyOpts.presets || []
+    babelifyOpts.plugins = babelifyOpts.plugins || []
+    babelifyOpts.plugins.push(require('babel-plugin-transform-runtime'))
+    if (vueBeUsed === '1') {
+      if (!useBabelRc()) { // TODO: babelify vs .babelrc?
+        require('vue1ify/node_modules/vueify/lib/compilers/options').babel = {
+          presets: babelifyOpts.presets.slice(),
+          plugins: babelifyOpts.plugins.slice()
+        }
+      }
+      bopts.paths = path.join(path.dirname(require.resolve('vue1ify')), 'node_modules', 'vueify', 'node_modules') + (process.platform === 'win32' ? ';' : ':') + path.join(path.dirname(require.resolve('vue1ify')), 'node_modules') + (process.platform === 'win32' ? ';' : ':') + (opts.paths || process.env.NODE_PATH || '')
+      vueify = require('vue1ify')
+    } else {
+      vueify = [require('vue2ify'), {
+        babel: {
+          presets: babelifyOpts.presets.slice(),
+          plugins: babelifyOpts.plugins.slice()
+        }
+      }]
+      bopts.paths = path.join(path.dirname(require.resolve('vue2ify')), 'node_modules') + (process.platform === 'win32' ? ';' : ':') + (opts.paths || process.env.NODE_PATH || '')
+    }
+  }
+  var b = browserify(bopts)
   if (opts.args.packageCache) {
     b.on('package', function (pkg) {
       var file = path.join(pkg.__dirname, 'package.json')
@@ -56,18 +126,11 @@ var bundle = function (entries, requires, opts) {
   if (requires && requires.length) {
     requires.forEach(fullPath => b.require(fullPath))
   }
-  if (opts.babelify !== false && !pkgBabelify) {
-    var babelifyOpts = xtend({}, opts.babelify)
-    if (!babelifyOpts.presets || (Array.isArray(babelifyOpts.presets) && !babelifyOpts.presets.length)) {
-      babelifyOpts.presets = [require('babel-preset-dysonshell'), require('babel-preset-react')]
-      if (opts.hmr) {
-        babelifyOpts.presets.push(require('babel-preset-react-hmre'))
-      }
-    }
-    if (!babelifyOpts.ignore || (Array.isArray(babelifyOpts.ignore) && !babelifyOpts.ignore.length)) {
-      babelifyOpts.ignore = /[\\\/]node_modules[\\\/]/
-    }
+  if (babelifyOpts) {
     b.transform(babelify, babelifyOpts)
+  }
+  if (vueify) {
+    b.transform(vueify)
   }
   if (opts.envify !== false) {
     b.transform(envify(opts.envify || {
