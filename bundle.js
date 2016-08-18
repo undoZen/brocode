@@ -79,6 +79,11 @@ var bundle = function (entries, requires, opts) {
         if (opts.hmr) {
           babelifyOpts.presets.push(require('babel-preset-react-hmre'))
         }
+        bopts.paths = [
+          path.join(bopts.basedir, 'node_modules'),
+          path.join(APP_ROOT, 'node_modules'),
+          (bopts.paths || process.env.NODE_PATH || '')
+        ].join((process.platform === 'win32' ? ';' : ':'))
       }
     }
     if (!babelifyOpts.ignore || (Array.isArray(babelifyOpts.ignore) && !babelifyOpts.ignore.length)) {
@@ -97,16 +102,27 @@ var bundle = function (entries, requires, opts) {
           plugins: babelifyOpts.plugins.slice()
         }
       }
-      bopts.paths = path.join(path.dirname(require.resolve('vue1ify')), 'node_modules', 'vueify', 'node_modules') + (process.platform === 'win32' ? ';' : ':') + path.join(path.dirname(require.resolve('vue1ify')), 'node_modules') + (process.platform === 'win32' ? ';' : ':') + (opts.paths || process.env.NODE_PATH || '')
+      bopts.paths = [
+        path.join(bopts.basedir, 'node_modules'),
+        path.join(APP_ROOT, 'node_modules'),
+        path.join(path.dirname(require.resolve('vue1ify')), 'node_modules', 'vueify', 'node_modules'),
+        path.join(path.dirname(require.resolve('vue1ify')), 'node_modules'),
+        (bopts.paths || process.env.NODE_PATH || '')
+      ].join((process.platform === 'win32' ? ';' : ':'))
       vueify = require('vue1ify')
     } else {
+      bopts.paths = [
+        path.join(bopts.basedir, 'node_modules'),
+        path.join(APP_ROOT, 'node_modules'),
+        path.join(path.dirname(require.resolve('vue2ify')), 'node_modules'),
+        (bopts.paths || process.env.NODE_PATH || '')
+      ].join((process.platform === 'win32' ? ';' : ':'))
       vueify = [require('vue2ify'), {
         babel: {
           presets: babelifyOpts.presets.slice(),
           plugins: babelifyOpts.plugins.slice()
         }
       }]
-      bopts.paths = path.join(path.dirname(require.resolve('vue2ify')), 'node_modules') + (process.platform === 'win32' ? ';' : ':') + (opts.paths || process.env.NODE_PATH || '')
     }
   }
   var b = browserify(bopts)
