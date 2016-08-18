@@ -71,7 +71,6 @@ function findAffectedModule(affectsMap, updatedFiles) {
 function update (onPath) {
   var p = path.resolve(SRC_ROOT, onPath)
   var hitCache = !!args.cache[p]
-  console.log('hitCache', p, hitCache);
   var matchGlobal = p.match(globalRegExp)
   if (matchGlobal) {
     cacheLibs = void 0
