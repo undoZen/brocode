@@ -72,12 +72,14 @@ var bundle = function (entries, requires, opts) {
   var babelifyOpts
   if (opts.babelify !== false && !pkgBabelify) {
     babelifyOpts = xtend({}, opts.babelify)
+    babelifyOpts.presets = babelifyOpts.presets || []
+    babelifyOpts.plugins = babelifyOpts.plugins || []
     if (!babelifyOpts.presets || (Array.isArray(babelifyOpts.presets) && !babelifyOpts.presets.length)) {
       babelifyOpts.presets = [require('babel-preset-dysonshell')]
       if (reactBeUsed) {
         babelifyOpts.presets.push(require('babel-preset-react'))
         if (opts.hmr) {
-          babelifyOpts.presets.push(require('babel-preset-react-hmre'))
+          babelifyOpts.plugins.push(require('react-hot-loader/babel'))
         }
         bopts.paths = [
           path.join(bopts.basedir, 'node_modules'),
@@ -92,6 +94,7 @@ var bundle = function (entries, requires, opts) {
   }
   if (vueBeUsed) {
     var vueify
+    babelifyOpts = babelifyOpts || {}
     babelifyOpts.presets = babelifyOpts.presets || []
     babelifyOpts.plugins = babelifyOpts.plugins || []
     babelifyOpts.plugins.push(require('babel-plugin-transform-runtime'))

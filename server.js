@@ -68,6 +68,19 @@ function findAffectedModule(affectsMap, updatedFiles) {
     updatedFiles.filter(f => !hmrModuleReg.test(f)).map(f => affectsMap[f])
   )
 }
+function getAffectsMap(modules) {
+  var affects = {}
+  var ignoreRegExp = /[\\\/]__hmr_manager.js$|\/brocode\/node_modules\//
+  _.each(modules, function (row, id) {
+    _.each(row.deps, function (dep) {
+      var af = affects[dep] || (affects[dep] = [])
+      if (!ignoreRegExp.test(dep) && !ignoreRegExp.test(id)) {
+        af.push(id)
+      }
+    })
+  })
+  return affects
+}
 function update (onPath) {
   var p = path.resolve(SRC_ROOT, onPath)
   var hitCache = !!args.cache[p]
@@ -76,17 +89,7 @@ function update (onPath) {
     cacheLibs = void 0
   } else if (hitCache) {
     var updatedFiles = [p]
-    var affects = {}
-    var ignoreRegExp = /[\\\/]__hmr_manager.js$|\/brocode\/node_modules\//
-    _.each(args.cache, function (row, id) {
-      _.each(row.deps, function (dep) {
-        var af = affects[dep] || (affects[dep] = [])
-        if (!ignoreRegExp.test(dep) && !ignoreRegExp.test(id)) {
-          af.push(id)
-        }
-      })
-    })
-    var affectedFiles = findAffectedModule(affects, p)
+    var affectedFiles = findAffectedModule(getAffectsMap(args.cache), p)
     delete args.cache[p]
     delete args.packageCache[p]
     delete args.packageCache[p + '/package.json']
@@ -101,10 +104,21 @@ function update (onPath) {
     if (af.length) {
       log('(update)', af, 'starting...')
       var start = Date.now()
-      bundle([], af, getOpts(false, true)).then(function () {
+      bundle([], af, getOpts(false, true, true)).then(function () {
         log('(update)', af, `${Date.now() - start}ms`)
       })
     }
+    /*
+    var ks = Object.keys(args.cache).filter(k => k.indexOf('/brocode/') === -1)
+    ks.forEach(console.log.bind(console))
+    var dd = ks.map(k => Object.keys(args.cache[k].deps))
+    console.log(JSON.stringify(dd))
+    var _ = require('lodash');
+    var ibm = require('is-builtin-module');
+    var df = _(d).flatten().unique()
+    .filter(n => /^[a-z0-9][a-z0-9-_]*$/.test(n) && !ibm(n))
+    .value()
+    */
   }
   reload()
 }
@@ -121,7 +135,7 @@ app.use(function (req, res, next) {
   next()
 })
 var globalLibsPath = path.join(SRC_ROOT, 'global.libs.json')
-function emitNewModules(socket, moduleData) {
+function emitNewModules(socket, moduleData, chunkOnly) {
   if (!socket.moduleData) {
     return
   }
@@ -136,7 +150,9 @@ function emitNewModules(socket, moduleData) {
         index: pair[1].index,
         hash: pair[1].hash,
         source: pair[1].source,
-        parents: pair[1].parents,
+        parents: chunkOnly && currentModuleData[pair[0]]
+          ? currentModuleData[pair[0]].parents // inherit previous parents
+          : pair[1].parents,
         deps: pair[1].deps
       }];
     })
@@ -154,12 +170,12 @@ function emitNewModules(socket, moduleData) {
     socket.emit('new modules', {newModuleData: newModuleData, removedModules: removedModules});
   }
 }
-function syncModules() {
+function syncModules(chunkOnly) {
   _.each(io.sockets.connected, function(socket) {
-    emitNewModules(socket, cacheModuleData)
+    emitNewModules(socket, cacheModuleData, chunkOnly)
   })
 }
-function getOpts(isGlobal, isHmr) {
+function getOpts(isGlobal, isHmr, chunkOnly) {
   var opts = { hmr: !!isHmr }
   var globalLibs = cacheLibs
   if (!globalLibs) {
@@ -180,7 +196,7 @@ function getOpts(isGlobal, isHmr) {
     opts.alterb = function (b) {
       b.on('setNewModuleData', function(moduleData) {
         _.assign(cacheModuleData, moduleData)
-        syncModules()
+        syncModules(chunkOnly)
       })
     }
     opts.externals = globalLibs.map(function (x) {
@@ -206,7 +222,7 @@ app.get(/.*\.js$/i, function (req, res, next) {
   if (req.url === '/global.js') {
     isGlobal = true
   }
-  var opts = getOpts(isGlobal, isHmr)
+  var opts = getOpts(isGlobal, isHmr, false)
 
   log('(bundle)', path.sep + path.relative(SRC_ROOT, filePath), `starting...`)
   var start = Date.now()
@@ -270,12 +286,12 @@ exports.start = function (port) {
       log('(sync)', mainScripts, 'starting...')
       var start = Date.now()
       ;(mainScripts.length
-      ? Promise.all(mainScripts.map((name) => bundle([path.join(SRC_ROOT, name)], [], getOpts(false, true))))
+      ? Promise.all(mainScripts.map((name) => bundle([path.join(SRC_ROOT, name)], [], getOpts(false, true, false))))
       : Promise.resolve([])).then(function (results) {
         log('(sync)', mainScripts, `${Date.now() - start}ms`)
         socket.moduleData = oldModuleData
         socket.emit('sync confirm', null);
-        emitNewModules(socket, cacheModuleData)
+        emitNewModules(socket, cacheModuleData, false)
       });
     });
   });
