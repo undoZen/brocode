@@ -92,9 +92,16 @@ var bundle = function (entries, requires, opts) {
       babelifyOpts.presets = [require('babel-preset-dysonshell')]
       if (reactBeUsed) {
         babelifyOpts.presets.push(require('babel-preset-react'))
-        if (opts.hmr && reactHotLoaderBeUsed) {
-          var rhlb = require('module')._findPath('react-hot-loader/babel', [ path.join(bopts.basedir, 'node_modules'), path.join(APP_ROOT, 'node_modules') ])
-          babelifyOpts.plugins.push(require(rhlb))
+        if (opts.hmr) {
+          if (reactHotLoaderBeUsed) {belifyOpts.presets.push(require('babel-preset-react-hmre'))
+            var rhlb = require('module')._findPath('react-hot-loader/babel', [
+              path.join(bopts.basedir, 'node_modules'),
+              path.join(APP_ROOT, 'node_modules')
+            ])
+            babelifyOpts.plugins.push(require(rhlb))
+          } else {
+            babelifyOpts.presets.push(require('babel-preset-react-hmre'))
+          }
         }
         bopts.paths = [
           path.join(bopts.basedir, 'node_modules'),
