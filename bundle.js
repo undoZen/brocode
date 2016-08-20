@@ -28,14 +28,28 @@ var reactBeUsed
 if ((pkginfo.dependencies || {})['react'] || (pkginfo.devDependencies || {})['react']) {
   reactBeUsed = true
 }
+var reactHotLoaderBeUsed = (function () {
+  var m, version
+  if ( (version = (pkginfo.dependencies || {})['react-hot-loader'] || (pkginfo.devDependencies || {})['react-hot-loader']) ) {
+    if ( !(m = /(\d)\./.exec(version)) ) {
+      return false
+    }
+    if (m[1] === '3') {
+      return true
+    } else {
+      console.warn('[CAUTION!] you are using react-hot-loader but not version 3')
+    }
+  }
+  return false
+}())
 var vueBeUsed = (function () {
   var m, version
   if ( (version = (pkginfo.dependencies || {})['vue'] || (pkginfo.devDependencies || {})['vue']) ) {
-    if ( !(m = /\d/.exec(version)) ) {
+    if ( !(m = /(\d)\./.exec(version)) ) {
       return false
     }
-    if (m[0] === '1' || m[0] === '2') {
-      return m[0]
+    if (m[1] === '1' || m[1] === '2') {
+      return m[1]
     }
   }
   return false
@@ -78,8 +92,9 @@ var bundle = function (entries, requires, opts) {
       babelifyOpts.presets = [require('babel-preset-dysonshell')]
       if (reactBeUsed) {
         babelifyOpts.presets.push(require('babel-preset-react'))
-        if (opts.hmr) {
-          babelifyOpts.plugins.push(require('react-hot-loader/babel'))
+        if (opts.hmr && reactHotLoaderBeUsed) {
+          var rhlb = require('module')._findPath('react-hot-loader/babel', [ path.join(bopts.basedir, 'node_modules'), path.join(APP_ROOT, 'node_modules') ])
+          babelifyOpts.plugins.push(require(rhlb))
         }
         bopts.paths = [
           path.join(bopts.basedir, 'node_modules'),
