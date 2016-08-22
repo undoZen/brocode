@@ -89,7 +89,7 @@ var bundle = function (entries, requires, opts) {
     babelifyOpts.presets = babelifyOpts.presets || []
     babelifyOpts.plugins = babelifyOpts.plugins || []
     if (!babelifyOpts.presets || (Array.isArray(babelifyOpts.presets) && !babelifyOpts.presets.length)) {
-      babelifyOpts.presets = [require('babel-preset-dysonshell')]
+      babelifyOpts.presets = [require('babel-preset-bro')]
       if (reactBeUsed) {
         babelifyOpts.presets.push(require('babel-preset-react'))
         if (opts.hmr) {
