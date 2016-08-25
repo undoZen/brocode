@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 'use strict'
 
 var fs = require('fs')
@@ -53,7 +52,7 @@ var reload = debounce(function () {
     browserSync.reload()
   }
 }, 300)
-var globalRegExp = /[\\\/]node_modules[\\\/]|[\\\/]src[\\\/]global\.(?:js|libs\.json)$/
+var globalRegExp = /[\\\/]node_modules[\\\/]|[\\\/]src[\\\/]global\.(?:js|libs\.json)$/i
 var hmrModuleReg = /\.(jsx?|vue)$/i
 var cacheLibs
 function findAffectedModule(affectsMap, updatedFiles) {
@@ -81,19 +80,28 @@ function getAffectsMap(modules) {
   })
   return affects
 }
+var fsCaseInsensitive = false
+try {
+  fsCaseInsensitive = require('./caseinsensitive')
+} catch (e) {}
+var hitCache = !fsCaseInsensitive
+  ? p => !!args.cache[p] ? [p] : []
+  : p => Object.keys(args.cache).filter(k => p.toUpperCase() === k.toUpperCase())
 function update (onPath) {
   var p = path.resolve(SRC_ROOT, onPath)
-  var hitCache = !!args.cache[p]
+  var toBeDeleted = hitCache(p)
   var matchGlobal = p.match(globalRegExp)
   if (matchGlobal) {
     cacheLibs = void 0
-  } else if (hitCache) {
-    var updatedFiles = [p]
+  } else if (toBeDeleted.length) {
+    p = toBeDeleted[0]
     var affectedFiles = findAffectedModule(getAffectsMap(args.cache), p)
-    delete args.cache[p]
-    delete args.packageCache[p]
-    delete args.packageCache[p + '/package.json']
-    delete args.packageCache[p + '\\package.json']
+    toBeDeleted.forEach(p => {
+      delete args.cache[p]
+      delete args.packageCache[p]
+      delete args.packageCache[p + '/package.json']
+      delete args.packageCache[p + '\\package.json']
+    })
     var af = affectedFiles
       .filter(p => hmrModuleReg.test(p))
       .filter(p => !(/\/js\/main\//.test(p)))
