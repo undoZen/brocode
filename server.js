@@ -8,7 +8,7 @@ var debounce = require('lodash.debounce')
 var APP_ROOT = process.cwd()
 var SRC_ROOT = path.join(APP_ROOT, 'src')
 var express = require('express')
-var st = require('st')
+var ecstatic = require('ecstatic')
 var xtend = require('xtend')
 var Promise = require('bluebird')
 var through = require('through2');
@@ -258,11 +258,9 @@ app.use(function (req, res, next) {
   next()
 })
 
-app.use(st({
-  cache: false,
-  dot: true,
-  path: APP_ROOT,
-  index: 'index.html'
+app.use(ecstatic({
+  showDotfiles: true,
+  root: APP_ROOT,
 }))
 
 var browserSync

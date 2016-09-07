@@ -64,7 +64,7 @@ var args = {
   paths: ['.'],
   cache: {},
   packageCache: {},
-  extensions: ['jsx']
+  extensions: ['.js', '.jsx']
 }
 function useBabelRc () {
   var babelRcPath = path.resolve(process.cwd(), '.babelrc')
