@@ -252,16 +252,30 @@ app.get(/.*\.js$/i, function (req, res, next) {
 })
 
 app.use(function (req, res, next) {
-  var sod = req.serverPort > app.port + 2 ? '/.dist' : '/src'
+  var sod = req.pathSOD = req.serverPort > app.port + 2 ? '/.dist' : '/src'
   req.url = sod + req.url
   log('[static]', req.url)
   next()
 })
 
 app.use(ecstatic({
+  showDir: false,
   showDotfiles: true,
   root: APP_ROOT,
 }))
+
+app.use(function (req, res, next) {
+  var url = req.url.replace(/^\/+\.*/, '')
+  if (req.method === 'GET' && (!url.match(/\./) || url.match(/\.html?$/i))) {
+    var t200path = path.join(APP_ROOT, req.pathSOD, '200.html')
+    fs.exists(t200path, (exists) => {
+      if (exists) {
+        res.status = 200
+        res.sendFile(t200path)
+      } else next()
+    })
+  } else next()
+})
 
 var browserSync
 var io
