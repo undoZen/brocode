@@ -91,7 +91,7 @@ gulp.task('build', function() {
           b.require(x[0], {expose: x[1] || x[0]})
         })
       }
-      opts.args = {basedir: mRoot.replace(/[\/]src$/, '')}
+      opts.args = {basedir: mRoot}
       bundle([file.path], [], opts).then(b => {
         file.contents = b
         this.push(file)
@@ -111,7 +111,7 @@ gulp.task('build', function() {
       opts.externals = globalLibs.map(function (x) {
         return x[1] || x[0]
       }).filter(Boolean)
-      opts.args = {basedir: mRoot.replace(/[\/]src$/, '')}
+      opts.args = {basedir: mRoot}
       bundle([file.path], [], opts).then(b => {
         file.contents = b
         this.push(file)
@@ -133,7 +133,7 @@ gulp.task('build', function() {
       }
     })))
     .pipe(gulpif(function (file) {
-      return /\.css/i.test(file.path) && file.path.indexOf('/css/') > -1
+      return /\.css$/i.test(file.path) && !/\.min\.css$/i.test(file.path)
     }, nano()))
     .pipe(dest())
 })
