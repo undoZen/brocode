@@ -259,6 +259,7 @@ app.use(function (req, res, next) {
 })
 
 app.use(ecstatic({
+  cache: 'no-cache',
   showDir: false,
   showDotfiles: true,
   root: APP_ROOT,

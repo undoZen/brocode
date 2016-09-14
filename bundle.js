@@ -92,7 +92,7 @@ var bundle = function (entries, requires, opts) {
       babelifyOpts.presets = [require('babel-preset-bro')]
       if (reactBeUsed) {
         babelifyOpts.presets.push(require('babel-preset-react'))
-        if (opts.hmr) {
+        if (opts.hmr && !opts.global) {
           if (reactHotLoaderBeUsed) {
             console.log('[HMR] using local react-hot-loader');
             var rhlb = require('module')._findPath('react-hot-loader/babel', [
