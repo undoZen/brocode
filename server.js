@@ -87,10 +87,26 @@ try {
 var hitCache = !fsCaseInsensitive
   ? p => !!args.cache[p] ? [p] : []
   : p => Object.keys(args.cache).filter(k => p.toUpperCase() === k.toUpperCase())
+var errored = {}
+function passForGood(p) {
+  return function (v) {
+    if (errored[p]) {
+      delete errored[p]
+    }
+    return v
+  }
+}
+function handleError(p) {
+  return function recordError(err) {
+    errored[p] = 1
+    throw err
+  }
+}
 function update (onPath) {
   var p = path.resolve(SRC_ROOT, onPath)
   var toBeDeleted = hitCache(p)
   var matchGlobal = p.match(globalRegExp)
+  var af = []
   if (matchGlobal) {
     cacheLibs = void 0
   } else if (toBeDeleted.length) {
@@ -102,20 +118,23 @@ function update (onPath) {
       delete args.packageCache[p + '/package.json']
       delete args.packageCache[p + '\\package.json']
     })
-    var af = affectedFiles
+    af = affectedFiles
       .filter(p => hmrModuleReg.test(p))
       .filter(p => !(/\/js\/main\//.test(p)))
       .filter(p => fs.existsSync(p))
     if (p.indexOf('/js/main/') > -1) {
       af.push(p)
     }
-    if (af.length) {
-      log('(update)', af, 'starting...')
-      var start = Date.now()
-      bundle([], af, getOpts(false, true, true)).then(function () {
-        log('(update)', af, `${Date.now() - start}ms`)
-      })
-    }
+  } else if (errored[p]) {
+    af = [p]
+  }
+  if (af.length) {
+    log('(update)', af, 'starting...')
+    var start = Date.now()
+    bundle([], af, getOpts(false, true, true)).then(passForGood(af), handleError(af)).then(function () {
+      log('(update)', af, `${Date.now() - start}ms`)
+    })
+  }
     /*
     var ks = Object.keys(args.cache).filter(k => k.indexOf('/brocode/') === -1)
     ks.forEach(console.log.bind(console))
@@ -127,7 +146,6 @@ function update (onPath) {
     .filter(n => /^[a-z0-9][a-z0-9-_]*$/.test(n) && !ibm(n))
     .value()
     */
-  }
   reload()
 }
 
@@ -234,7 +252,10 @@ app.get(/.*\.js$/i, function (req, res, next) {
 
   log('(bundle)', path.sep + path.relative(SRC_ROOT, filePath), `starting...`)
   var start = Date.now()
-  var b = (exists) => (exists ? bundle([filePath], [], opts) : bundle([], [], opts)).then(b => {
+
+  var b = (exists) => (exists
+                       ? bundle([filePath], [], opts).then(passForGood(filePath), handleError(filePath))
+                       : bundle([], [], opts)).then(passForGood(filePath), handleError(filePath)).then(b => {
     log('(bundle)', path.sep + path.relative(SRC_ROOT, filePath), `${Date.now() - start}ms`)
     res.type('js')
     res.send(b)
@@ -307,7 +328,7 @@ exports.start = function (port) {
       log('(sync)', mainScripts, 'starting...')
       var start = Date.now()
       ;(mainScripts.length
-      ? Promise.all(mainScripts.map((name) => bundle([path.join(SRC_ROOT, name)], [], getOpts(false, true, false))))
+      ? Promise.all(mainScripts.map((name) => path.join(SRC_ROOT, name)).map((p) => bundle([p], [], getOpts(false, true, false)).then(passForGood(p), handleError(p))))
       : Promise.resolve([])).then(function (results) {
         log('(sync)', mainScripts, `${Date.now() - start}ms`)
         socket.moduleData = oldModuleData
