@@ -12,7 +12,7 @@ var bpack = require('browser-pack')
 var envify = require('envify/custom')
 var uglifyify = require('uglifyify')
 
-var qasSrc = fs.readFileSync(require.resolve('qas/qas.min.js'), 'utf-8')
+var qasSrc = fs.readFileSync(require.resolve('qas/qas.min.js'), 'utf-8').trim()
 var qasWrapperHeader = fs.readFileSync(require.resolve('qas/loader-wrapper-header.js'), 'utf-8')
 var qasWrapperFooter = fs.readFileSync(require.resolve('qas/loader-wrapper-footer.js'), 'utf-8')
 
@@ -202,9 +202,9 @@ var bundle = function (entries, requires, opts) {
   }
   return bundlePromise(b).then(src => {
     if (opts.global) {
-      return new Buffer(qasSrc + 'QAS.sync(function () { ' + src + '}); QAS.ready()', 'utf-8')
+      return new Buffer(src + '}); QAS.ready()', 'utf-8')
     } else {
-      return new Buffer(qasWrapperHeader + src + qasWrapperFooter + 'if (!document.querySelector("script[brocode-global]")) { ' + qasSrc + 'QAS.ready() };', 'utf-8')
+      return new Buffer(src + '}); if (!document.querySelector("script[brocode-global]")) { QAS.ready() };', 'utf-8')
     }
   }).catch(err => {
     if (err._babel) {
@@ -224,7 +224,8 @@ function alterPipeline (b, opts) {
     .splice(0, 1, bpack(xtend(args, {
       raw: true,
       hasExports: true,
-      externalRequireName: 'var require = QAS.require; QAS.require'
+      externalRequireName: 'if (!this.QAS) {' + qasSrc + '}QAS' +
+        (opts.global ? '.sync' : '') + '(function () { var require = QAS.require; QAS.require'
     })))
   if (opts.args.cache) {
     var cache = opts.args.cache
