@@ -120,9 +120,9 @@ function update (onPath) {
     })
     af = affectedFiles
       .filter(p => hmrModuleReg.test(p))
-      .filter(p => !(/\/js\/main\//.test(p)))
+      .filter(p => !(/\/js\/main(\/|\.js$)/.test(p)))
       .filter(p => fs.existsSync(p))
-    if (p.indexOf('/js/main/') > -1) {
+    if (p.indexOf('/js/main/') > -1 || p.indexOf('/js/main.js') > -1) {
       af.push(p)
     }
   } else if (errored[p]) {
@@ -239,7 +239,7 @@ app.get(/.*\.js$/i, function (req, res, next) {
   } else if (req.serverPort === app.port + 2) {
     isHmr = true
   }
-  if (!(req.url === '/global.js' || req.url.indexOf('/js/main/') > -1)) {
+  if (!(req.url === '/js/main.js' || req.url === '/global.js' || req.url.indexOf('/js/main/') > -1)) {
     return next()
   }
   var filePath = path.join(SRC_ROOT, req.url)
@@ -323,7 +323,7 @@ exports.start = function (port) {
       log('User connected, syncing');
       var oldModuleData = _.pick(cacheModuleData, _.keys(syncMsg))
       var mainScripts = _.keys(syncMsg).filter(function(name) {
-        return name.startsWith('js/main/')
+        return name.startsWith('js/main/') || name === 'js/main.js'
       })
       log('(sync)', mainScripts, 'starting...')
       var start = Date.now()

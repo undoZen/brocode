@@ -60,7 +60,7 @@ function tFakeRoot(prefix) {
   var args = [].slice.call(arguments).filter(Boolean)
   return through.obj(function (file, enc, cb) {
     var relativePath = path.relative(file.base, file.path)
-    file.base = path.sep + 'fakeSrcRoot'
+    file.base = '/fakeSrcRoot'
     file.path = path.join(file.base, relativePath)
     this.push(file)
     cb()
@@ -80,7 +80,7 @@ if (fs.existsSync(globalLibsPath)) {
 
 gulp.task('build', function() {
   return es.merge(src(['**/*', '!js/**']),
-                  src(['js/dist/**/*.js', 'js/raw/**/*.js', 'js/main/**/*.js']))
+                  src(['js/dist/**/*.js', 'js/raw/**/*.js', 'js/main/**/*.js', 'js/main.js']))
     .pipe(gulpif(function (file) {
       return path.relative(file.base, file.path) === 'global.js'
     }, through.obj(function(file, enc, done) {
@@ -99,13 +99,13 @@ gulp.task('build', function() {
       })
     })))
     .pipe(gulpif(function (file) {
-      return /\.js$/i.test(file.path) && file.path.indexOf('/js/raw/') > -1
+      return /\.js$/i.test(file.path) && /[\\\/]js[\\\/]raw[\\\/]/.test(file.path)
     }, combineStream(
       insert.prepend(qasWrapperHeader),
       insert.append(qasWrapperFooter)
     )))
     .pipe(gulpif(function (file) {
-      return /\.js$/i.test(file.path) && file.path.indexOf('/js/main/') > -1
+      return /\.js$/i.test(file.path) && /[\\\/]js[\\\/]main(\.js$|[\\\/])/.test(file.path)
     }, through.obj(function(file, enc, done) {
       var opts = {}
       opts.externals = globalLibs.map(function (x) {
@@ -122,7 +122,7 @@ gulp.task('build', function() {
     .pipe(revAll.revision())
     .pipe(gulpif(function (file) {
       return /\.js$/i.test(file.path) && !(/\.min\.[a-f0-9]{8}\.js$/i.test(file.path)) &&
-        ((/^\/fakeSrcRoot\/global\.[a-f0-9]{8}\.js$/i.test(file.path)) || file.path.match(/\/js\/(main|raw)\//))
+        ((/^[\\\/]fakeSrcRoot[\\\/]global\.[a-f0-9]{8}\.js$/i.test(file.path)) || file.path.match(/[\\\/]js[\\\/](main\.js$|main[\\\/]|raw[\\\/])/))
     }, uglify({
       compress: {
         drop_console: true
