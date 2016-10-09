@@ -1,0 +1,6 @@
+{
+  "name": "Brocode",
+  "tagline": "A Bro doesn't allow another Bro to struggle with web packaging tools.",
+  "body": "# brocode\r\n\r\nA Bro doesn't allow another Bro to struggle with web packaging tools.\r\n\r\nSo here goes a browserify setup with multiple entry point.\r\n\r\n## install\r\n\r\nnpm i -g brocode\r\n\r\n## usage\r\n\r\nbrocode server\r\n\r\nbrocode build\r\n",
+  "note": "Don't delete this file! It's used internally to help with page regeneration."
+}
