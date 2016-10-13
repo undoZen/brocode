@@ -46,7 +46,11 @@ watcher.on('all', (event, onPath) => {
   if (['change', 'unlink', 'unlinkDir'].indexOf(event) === -1) {
     return
   }
-  update(onPath)
+  if (onPath === 'global.js' || 'global.libs.json') {
+    globalCache = {}
+  } else {
+    update(onPath)
+  }
 })
 var reload = debounce(function () {
   if (browserSync && typeof browserSync.reload === 'function') {
@@ -248,6 +252,12 @@ app.get(/.*\.js$/i, function (req, res, next) {
 
   if (req.url === '/global.js') {
     isGlobal = true
+    if (globalCache.b) {
+      res.type('js')
+      res.send(globalCache.b)
+      log('(bundle)', path.sep + path.relative(SRC_ROOT, filePath), `from cache`)
+      return
+    }
   }
   var opts = getOpts(isGlobal, isHmr, false)
 
@@ -258,6 +268,9 @@ app.get(/.*\.js$/i, function (req, res, next) {
                        ? bundle([filePath], [], opts).then(passForGood(filePath), handleError(filePath))
                        : bundle([], [], opts)).then(passForGood(filePath), handleError(filePath)).then(b => {
     log('(bundle)', path.sep + path.relative(SRC_ROOT, filePath), `${Date.now() - start}ms`)
+    if (isGlobal) {
+      globalCache.b = b
+    }
     res.type('js')
     res.send(b)
   })
