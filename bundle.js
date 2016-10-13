@@ -100,9 +100,6 @@ var bundle = function (entries, requires, opts) {
               path.join(APP_ROOT, 'node_modules')
             ])
             babelifyOpts.plugins.push(require(rhlb))
-          } else {
-            console.log('[HMR] using babel-preset-react-hmre');
-            babelifyOpts.presets.push(require('babel-preset-react-hmre'))
           }
         }
         bopts.paths = [
@@ -116,8 +113,8 @@ var bundle = function (entries, requires, opts) {
       babelifyOpts.ignore = /[\\\/]node_modules[\\\/]/
     }
   }
+  var vueify
   if (vueBeUsed) {
-    var vueify
     babelifyOpts = babelifyOpts || {}
     babelifyOpts.presets = babelifyOpts.presets || []
     babelifyOpts.plugins = babelifyOpts.plugins || []

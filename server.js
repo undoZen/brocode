@@ -16,6 +16,7 @@ var through = require('through2');
 var _ = require('lodash');
 var socketio = require('socket.io');
 var has = require('./browserify-hmr/lib/has');
+var pkginfo = require(path.join(APP_ROOT, 'package.json'))
 
 var chokidar = require('chokidar')
 var watcher = chokidar.watch(SRC_ROOT, {
@@ -202,7 +203,7 @@ function syncModules(chunkOnly) {
   })
 }
 function getOpts(isGlobal, isHmr, chunkOnly) {
-  var opts = { hmr: !!isHmr }
+  var opts = xtend(pkginfo.brocode || {}, { hmr: !!isHmr })
   var globalLibs = cacheLibs
   if (!globalLibs) {
     globalLibs = []

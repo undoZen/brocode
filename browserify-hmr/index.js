@@ -157,7 +157,8 @@ module.exports = function(opts) {
         });
       }
       next(null, row);
-    }));
+    }))
+    bundle.pipeline.get('sort').pop()
 
     var moduleData = {};
     var managerRow = null;
@@ -180,7 +181,8 @@ module.exports = function(opts) {
         var hash = moduleMeta[fileKey(row.file)].hash = hashStr(row.source);
         var originalSource = row.source;
         var isNew, thunk;
-        if (has(transformCache, row.file) && transformCache[row.file].hash === hash) {
+        var isCached = has(transformCache, row.file)
+        if (isCached && transformCache[row.file].hash === hash) {
           isNew = false;
           row.source = transformCache[row.file].transformedSource;
           thunk = _.constant(row);
@@ -229,6 +231,9 @@ module.exports = function(opts) {
           // Buffer everything so we can get the websocket stuff done sooner
           // without being slowed down by the final bundling.
           rowBuffer.push(thunk);
+          if (isCached && isNew) {
+            bundle.emit('setNewModuleData', moduleData)
+          }
           next(null);
         } else {
           next(null, thunk());
@@ -256,7 +261,7 @@ module.exports = function(opts) {
           .replace('null/*!^^incPath*/', JSON.stringify(incPath));
         self.push(managerRow);
       }).then(done, done);
-    }));
+    }))
   }
   return function setup (b) {
     setupPipelineMods(b);
