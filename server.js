@@ -46,7 +46,7 @@ watcher.on('all', (event, onPath) => {
   if (['change', 'unlink', 'unlinkDir'].indexOf(event) === -1) {
     return
   }
-  if (onPath === 'global.js' || 'global.libs.json') {
+  if (onPath === 'global.js' || onPath === 'global.libs.json') {
     globalCache = {}
   } else {
     update(onPath)
