@@ -1,0 +1,5 @@
+[
+  ["redux"],
+  ["react/dist/react.js", "react"],
+  ["react-dom"]
+]

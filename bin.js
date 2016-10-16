@@ -17,4 +17,6 @@ if (c1 === 'build') {
   gulp.start('build')
 } else if (c1 === 'server') {
   require('./server').start(argv.port)
+} else if (c1 === 'init') {
+  require('./init').cpr(c2)
 }

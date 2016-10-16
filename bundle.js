@@ -45,7 +45,7 @@ var reactHotLoaderBeUsed = (function () {
 var vueBeUsed = (function () {
   var m, version
   if ( (version = (pkginfo.dependencies || {})['vue'] || (pkginfo.devDependencies || {})['vue']) ) {
-    if ( !(m = /(\d)\./.exec(version)) ) {
+    if ( !(m = /(\d)(\.|$)/.exec(version)) ) {
       return false
     }
     if (m[1] === '1' || m[1] === '2') {
@@ -64,7 +64,7 @@ var args = {
   paths: ['.'],
   cache: {},
   packageCache: {},
-  extensions: ['.js', '.jsx']
+  extensions: ['.js', '.jsx', '.vue']
 }
 function useBabelRc () {
   var babelRcPath = path.resolve(process.cwd(), '.babelrc')

@@ -58,7 +58,7 @@ var reload = debounce(function () {
   }
 }, 300)
 var globalRegExp = /[\\\/]node_modules[\\\/]|[\\\/]src[\\\/]global\.(?:js|libs\.json)$/i
-var hmrModuleReg = /\.(jsx?|vue)$/i
+var hmrModuleReg = /\.(jsx?|ls|coffee|vue)$/i
 var cacheLibs
 function findAffectedModule(affectsMap, updatedFiles) {
   if (!Array.isArray(updatedFiles)) {
@@ -109,6 +109,7 @@ function handleError(p) {
 }
 function update (onPath) {
   var p = path.resolve(SRC_ROOT, onPath)
+  console.log(Object.keys(args.cache).filter(f => /\.ls/.test(f)))
   var toBeDeleted = hitCache(p)
   var matchGlobal = p.match(globalRegExp)
   var af = []

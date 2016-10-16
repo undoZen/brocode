@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "partialify": "^3.1.6",
+    "react": "^15",
+    "react-dom": "^15",
+    "redux": "^3"
+  },
+  "browserify": {
+    "transform": [
+      [
+        "partialify"
+      ]
+    ]
+  }
+}
