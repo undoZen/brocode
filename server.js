@@ -48,6 +48,9 @@ watcher.on('all', (event, onPath) => {
   }
   if (onPath === 'global.js' || onPath === 'global.libs.json') {
     globalCache = {}
+    if (onPath === 'global.js') {
+      hitCache(path.resolve(SRC_ROOT, onPath)).forEach(removeCache)
+    }
   } else {
     update(onPath)
   }
@@ -107,9 +110,14 @@ function handleError(p) {
     throw err
   }
 }
+function removeCache(p) {
+  delete args.cache[p]
+  delete args.packageCache[p]
+  delete args.packageCache[p + '/package.json']
+  delete args.packageCache[p + '\\package.json']
+}
 function update (onPath) {
   var p = path.resolve(SRC_ROOT, onPath)
-  console.log(Object.keys(args.cache).filter(f => /\.ls/.test(f)))
   var toBeDeleted = hitCache(p)
   var matchGlobal = p.match(globalRegExp)
   var af = []
@@ -118,12 +126,7 @@ function update (onPath) {
   } else if (toBeDeleted.length) {
     p = toBeDeleted[0]
     var affectedFiles = findAffectedModule(getAffectsMap(args.cache), p)
-    toBeDeleted.forEach(p => {
-      delete args.cache[p]
-      delete args.packageCache[p]
-      delete args.packageCache[p + '/package.json']
-      delete args.packageCache[p + '\\package.json']
-    })
+    toBeDeleted.forEach(removeCache)
     af = affectedFiles
       .filter(p => hmrModuleReg.test(p))
       .filter(p => !(/\/js\/main(\/|\.js$)/.test(p)))

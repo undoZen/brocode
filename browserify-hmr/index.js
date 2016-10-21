@@ -231,9 +231,6 @@ module.exports = function(opts) {
           // Buffer everything so we can get the websocket stuff done sooner
           // without being slowed down by the final bundling.
           rowBuffer.push(thunk);
-          if (isCached && isNew && _.every(_.values(row.indexDeps || row.deps), (p) => moduleData[fileKey(p)])) {
-            bundle.emit('setNewModuleData', moduleData)
-          }
           next(null);
         } else {
           next(null, thunk());
