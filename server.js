@@ -48,9 +48,8 @@ watcher.on('all', (event, onPath) => {
   }
   if (onPath === 'global.js' || onPath === 'global.libs.json') {
     globalCache = {}
-    if (onPath === 'global.js') {
-      hitCache(path.resolve(SRC_ROOT, onPath)).forEach(removeCache)
-    }
+    cacheLibs = void 0
+    hitCache(path.resolve(SRC_ROOT, 'global.js')).forEach(removeCache)
   } else {
     update(onPath)
   }
