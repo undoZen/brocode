@@ -120,36 +120,16 @@ var bundle = function (entries, requires, opts) {
     babelifyOpts.plugins = babelifyOpts.plugins || []
     babelifyOpts.plugins.push(require('babel-plugin-transform-runtime'))
     if (vueBeUsed === '1') {
-      if (!useBabelRc()) { // TODO: babelify vs .babelrc?
-        var rmReg = /[\\\/]vue1?ify[\\\/]index\.js$/
-        var vue1ifyPath = require.resolve('vue1ify')
-        var vue1ifyNMP = vue1ifyPath.replace(rmReg, '')
-        var vueifyPath = require('module')._findPath('vueify', [ path.join(vue1ifyNMP, 'vue1ify', 'node_modules'), vue1ifyNMP ])
-        var vueifyNMP = vueifyPath.replace(rmReg, '')
-        require(path.join(vueifyNMP, 'vueify', 'lib', 'compilers', 'options')).babel = {
-          presets: babelifyOpts.presets.slice(),
-          plugins: babelifyOpts.plugins.slice()
-        }
-      }
-      var paths = [
-        path.join(bopts.basedir, 'node_modules'),
-        path.join(APP_ROOT, 'node_modules'),
-        path.join(vueifyNMP),
-        (bopts.paths || process.env.NODE_PATH || '')
-      ]
-      if (vueifyNMP !== vue1ifyNMP) {
-        paths.splice(2, 0, vue1ifyNMP)
-      }
-      bopts.paths = paths.join((process.platform === 'win32' ? ';' : ':'))
-      vueify = require('vue1ify')
+      throw new Error('vue 1 is not being supported by brocode@2')
+      process.exit(1)
     } else {
       bopts.paths = [
         path.join(bopts.basedir, 'node_modules'),
         path.join(APP_ROOT, 'node_modules'),
-        path.join(path.dirname(require.resolve('vue2ify')), 'node_modules'),
+        path.join(__dirname, 'node_modules'),
         (bopts.paths || process.env.NODE_PATH || '')
       ].join((process.platform === 'win32' ? ';' : ':'))
-      vueify = [require('vue2ify'), {
+      vueify = [require('vueify'), {
         babel: {
           presets: babelifyOpts.presets.slice(),
           plugins: babelifyOpts.plugins.slice()
