@@ -2,7 +2,7 @@
   <div class="page">
     <counter></counter>
     <p>
-      To get started, edit files in <code>../src/js/lib/</code> and save.
+      To get started, edit files in <code>src/</code> and save.
     </p>
   </div>
 </template>

@@ -4,6 +4,7 @@ var fs = require('fs')
 var path = require('path')
 var http = require('http')
 var debounce = require('lodash.debounce')
+var globby = require('globby');
 
 var APP_ROOT = process.cwd()
 var SRC_ROOT = path.join(APP_ROOT, 'src')
@@ -11,6 +12,7 @@ var express = require('express')
 var ecstatic = require('ecstatic')
 var xtend = require('xtend')
 var Promise = require('bluebird')
+var co = Promise.coroutine
 var through = require('through2');
 
 var _ = require('lodash');
@@ -205,10 +207,13 @@ function emitNewModules(socket, moduleData, chunkOnly) {
   }
 }
 function syncModules(chunkOnly) {
-  _.each(io.sockets.connected, function(socket) {
-    emitNewModules(socket, cacheModuleData, chunkOnly)
-  })
+  if (io && io.sockets && io.sockets.connected) {
+    _.each(io.sockets.connected, function(socket) {
+      emitNewModules(socket, cacheModuleData, chunkOnly)
+    })
+  }
 }
+var usedExternals = {}
 function getOpts(isGlobal, isHmr, chunkOnly) {
   var opts = xtend(pkginfo.brocode || {}, { hmr: !!isHmr })
   var globalLibs = cacheLibs
@@ -222,8 +227,8 @@ function getOpts(isGlobal, isHmr, chunkOnly) {
   if (isGlobal) {
     opts.global = true
     opts.alterb = function (b) {
-      globalLibs.forEach(function (x) {
-        b.require(x[0], {expose: x[1] || x[0]})
+      Object.keys(usedExternals).forEach(function (x) {
+        b.require(x, {expose: x})
       })
     }
   } else {
@@ -233,11 +238,23 @@ function getOpts(isGlobal, isHmr, chunkOnly) {
         syncModules(chunkOnly)
       })
     }
+    /*
     opts.externals = globalLibs.map(function (x) {
       return x[1] || x[0]
     }).filter(Boolean)
+    */
   }
   opts.args = xtend(args, {basedir: SRC_ROOT}, (!isGlobal && isHmr ? {plugin: [hmrPlugin]} : {}))
+  if (!isGlobal) {
+    opts.args.filter = function(id) {
+      if (typeof id === 'string' && id[0] !== '.' &&
+          id.indexOf(SRC_ROOT) !== 0) {
+        usedExternals[id] = 1
+        return false
+      }
+      return true
+    }
+  }
   return opts
 }
 app.get(/.*\.js$/i, function (req, res, next) {
@@ -326,6 +343,25 @@ Object.defineProperty(exports, 'io', {
 
 exports.app = app
 exports.start = function (port) {
+  var mainFiles = globby.sync(['js/main.js', 'js/main.jsx', 'js/**/*.main.js', 'js/**/*.main.jsx'], {cwd: SRC_ROOT})
+  co(function * () {
+    var opts
+    for (var main, i = -1; main = mainFiles[++i];) {
+      console.log('pre-compiling ' + main + ' ...');
+      opts = getOpts(false, true, false)
+      yield bundle([path.join(SRC_ROOT, main)], [], opts)
+    }
+    console.log('bundling global with auto-detected externals:\n  ' + Object.keys(usedExternals).join('\n  '));
+    var globalPath = path.join(SRC_ROOT, 'global.js')
+    var globalExists = fs.existsSync(globalPath)
+    var start = Date.now()
+    opts = getOpts(true, false, false)
+    globalCache.b = yield bundle((globalExists ? [globalPath] : []), [], opts)//.then(passForGood(filePath), handleError(filePath))
+    console.log('bundled global.js', `${Date.now() - start}ms`)
+
+  })().then(function() {
+
+  console.log(mainFiles);
   port = port || 8000
   app.port = port
   var server = http.createServer(app)
@@ -376,5 +412,7 @@ exports.start = function (port) {
 
   distServer.listen(port + 3, '0.0.0.0', function () {
     console.log('production preview server listening at http://0.0.0.0:%d, run `brocode build` to update', this.address().port)
+  })
+
   })
 }
