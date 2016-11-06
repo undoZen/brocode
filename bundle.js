@@ -113,6 +113,12 @@ var bundle = function (entries, requires, opts) {
       babelifyOpts.ignore = /[\\\/]node_modules[\\\/]/
     }
   }
+  bopts.paths = [
+    path.join(bopts.basedir, 'node_modules'),
+    path.join(APP_ROOT, 'node_modules'),
+    path.join(__dirname, 'node_modules'),
+    (bopts.paths || process.env.NODE_PATH || '')
+  ].join((process.platform === 'win32' ? ';' : ':'))
   var vueify
   if (vueBeUsed) {
     babelifyOpts = babelifyOpts || {}
@@ -123,12 +129,6 @@ var bundle = function (entries, requires, opts) {
       throw new Error('vue 1 is not being supported by brocode@2')
       process.exit(1)
     } else {
-      bopts.paths = [
-        path.join(bopts.basedir, 'node_modules'),
-        path.join(APP_ROOT, 'node_modules'),
-        path.join(__dirname, 'node_modules'),
-        (bopts.paths || process.env.NODE_PATH || '')
-      ].join((process.platform === 'win32' ? ';' : ':'))
       vueify = [require('vueify'), {
         babel: {
           presets: babelifyOpts.presets.slice(),
