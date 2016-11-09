@@ -248,7 +248,7 @@ function getOpts(isGlobal, isHmr, chunkOnly) {
   if (!isGlobal) {
     opts.args.filter = function(id) {
       if (typeof id === 'string' && id[0] !== '.' &&
-          id.indexOf(SRC_ROOT) !== 0) {
+          (id.indexOf(SRC_ROOT) !== 0 || id.indexOf(path.join(SRC_ROOT, 'node_modules')) === 0 )) {
         usedExternals[id] = 1
         return false
       }

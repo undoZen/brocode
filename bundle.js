@@ -66,18 +66,27 @@ var args = {
   packageCache: {},
   extensions: ['.js', '.jsx', '.vue']
 }
-function useBabelRc () {
+function getBabelRc () {
   var babelRcPath = path.resolve(process.cwd(), '.babelrc')
-  if (!fs.existsSync(babelRcPath)) {
+  var babelRcJsPath = path.resolve(process.cwd(), 'babelrc.js')
+  var e1, e2
+  if (!(e1 = fs.existsSync(babelRcPath)) && !(e2 = fs.existsSync(babelRcJsPath))) {
     return false
   }
   var rc
   try {
-    rc = JSON.parse(fs.readFileSync(babelRcPath, 'utf-8'))
+    if (e1) {
+      rc = JSON.parse(fs.readFileSync(babelRcPath, 'utf-8'))
+    } else {
+      rc = {
+        presets: (require(babelRcJsPath).presets || []).slice(),
+        plugins: (require(babelRcJsPath).plugins || []).slice()
+      }
+    }
   } catch (e) {
-    throw new Error('[vueify] Your .babelrc seems to be incorrectly formatted.')
+    throw new Error('[vueify] Your .babelrc or babelrc.js seems to be incorrectly formatted.')
   }
-  return !!rc
+  return rc
 }
 
 var bundle = function (entries, requires, opts) {
@@ -85,7 +94,7 @@ var bundle = function (entries, requires, opts) {
   var bopts = xtend(args, opts.args || {})
   var babelifyOpts
   if (opts.babelify !== false && !pkgBabelify) {
-    babelifyOpts = xtend({}, opts.babelify)
+    babelifyOpts = xtend({}, opts.babelify, getBabelRc ())
     babelifyOpts.presets = babelifyOpts.presets || []
     babelifyOpts.plugins = babelifyOpts.plugins || []
     if (!babelifyOpts.presets || (Array.isArray(babelifyOpts.presets) && !babelifyOpts.presets.length)) {
@@ -124,16 +133,18 @@ var bundle = function (entries, requires, opts) {
     babelifyOpts = babelifyOpts || {}
     babelifyOpts.presets = babelifyOpts.presets || []
     babelifyOpts.plugins = babelifyOpts.plugins || []
-    babelifyOpts.plugins.push(require('babel-plugin-transform-runtime'))
+    //babelifyOpts.plugins.push(require('babel-plugin-transform-runtime'))
     if (vueBeUsed === '1') {
       throw new Error('vue 1 is not being supported by brocode@2')
       process.exit(1)
     } else {
       vueify = [require('vueify'), {
-        babel: {
-          presets: babelifyOpts.presets.slice(),
-          plugins: babelifyOpts.plugins.slice()
-        }
+        // customCompilers: {
+          babel: {
+            presets: babelifyOpts.presets.slice(),
+            plugins: babelifyOpts.plugins.slice()
+          }
+        // }
       }]
     }
   }
