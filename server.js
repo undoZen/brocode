@@ -16,8 +16,6 @@ var co = Promise.coroutine
 var through = require('through2');
 
 var _ = require('lodash');
-var socketio = require('socket.io');
-var has = require('./browserify-hmr/lib/has');
 var pkginfo = require(path.join(APP_ROOT, 'package.json'))
 
 var chokidar = require('chokidar')
@@ -29,7 +27,11 @@ var watcher = chokidar.watch(SRC_ROOT, {
   ignoreInitial: true
 })
 
-var bundle = require('./bundle')
+var bundle = require('./browserify')
+var rollup = require('./rollup')
+
+var rollupCache = {}
+
 var args = {
   fullPaths: true,
   cache: {},
@@ -37,13 +39,10 @@ var args = {
 }
 
 var EventEmitter = require('events').EventEmitter
-var _hmr = global._hmr = {
-  transformCache: {},
-}
-var hmrPlugin = require('./browserify-hmr')({basedir: SRC_ROOT})
 var cacheModuleData = {}
 
 var globalCache = {}
+var globalCacheValid = Promise.resolve(true)
 watcher.on('all', (event, onPath) => {
   if (['change', 'unlink', 'unlinkDir'].indexOf(event) === -1) {
     return
@@ -53,6 +52,14 @@ watcher.on('all', (event, onPath) => {
     cacheLibs = void 0
     hitCache(path.resolve(SRC_ROOT, 'global.js')).forEach(removeCache)
   } else {
+    if (globalCacheValid.isPending()) {
+      globalCacheValid.resolve(true) //resolve previous lock
+    }
+    var r
+    globalCacheValid = new Promise((resolve) => { //lock until main built
+      r = resolve
+    })
+    globalCacheValid.resolve = r
     update(onPath)
   }
 })
@@ -64,31 +71,6 @@ var reload = debounce(function () {
 var globalRegExp = /[\\\/]node_modules[\\\/]|[\\\/]src[\\\/]global\.(?:js|libs\.json)$/i
 var hmrModuleReg = /\.(jsx?|ls|coffee|vue)$/i
 var cacheLibs
-function findAffectedModule(affectsMap, updatedFiles) {
-  if (!Array.isArray(updatedFiles)) {
-    updatedFiles = [updatedFiles]
-  }
-  if (_.every(updatedFiles, f => hmrModuleReg.test(f))) {
-    return updatedFiles
-  }
-  return Array.prototype.concat.apply(
-    updatedFiles.filter(f => hmrModuleReg.test(f)),
-    updatedFiles.filter(f => !hmrModuleReg.test(f)).map(f => affectsMap[f])
-  )
-}
-function getAffectsMap(modules) {
-  var affects = {}
-  var ignoreRegExp = /[\\\/]__hmr_manager.js$|\/brocode\/node_modules\//
-  _.each(modules, function (row, id) {
-    _.each(row.deps, function (dep) {
-      var af = affects[dep] || (affects[dep] = [])
-      if (!ignoreRegExp.test(dep) && !ignoreRegExp.test(id)) {
-        af.push(id)
-      }
-    })
-  })
-  return affects
-}
 var fsCaseInsensitive = false
 try {
   fsCaseInsensitive = require('./caseinsensitive')
@@ -141,7 +123,7 @@ function update (onPath) {
   if (af.length) {
     log('(update)', af, 'starting...')
     var start = Date.now()
-    bundle([], af, getOpts(false, true, true)).then(passForGood(af), handleError(af)).then(function () {
+    bundle([], af, getOpts(false, true)).then(passForGood(af), handleError(af)).then(function () {
       log('(update)', af, `${Date.now() - start}ms`)
     })
   }
@@ -170,52 +152,11 @@ app.use(function (req, res, next) {
   req.serverPort = req.connection.server.address().port
   next()
 })
+var browserify = require('browserify');
 var globalLibsPath = path.join(SRC_ROOT, 'global.libs.json')
-function emitNewModules(socket, moduleData, chunkOnly) {
-  if (!socket.moduleData) {
-    return
-  }
-  var currentModuleData = socket.moduleData
-  var newModuleData = _.chain(moduleData)
-    .toPairs()
-    .filter(function(pair) {
-      return pair[1].isNew && (!currentModuleData[pair[0]] || currentModuleData[pair[0]].hash !== pair[1].hash)
-    })
-    .map(function(pair) {
-      return [pair[0], {
-        index: pair[1].index,
-        hash: pair[1].hash,
-        source: pair[1].source,
-        parents: chunkOnly && currentModuleData[pair[0]]
-          ? currentModuleData[pair[0]].parents // inherit previous parents
-          : pair[1].parents,
-        deps: pair[1].deps
-      }];
-    })
-    .fromPairs()
-    .value();
-  _.assign(socket.moduleData, newModuleData)
-  var removedModules = _.chain(currentModuleData)
-    .keys()
-    .filter(function(name) {
-      return !has(moduleData, name);
-    })
-    .value();
-  if (Object.keys(newModuleData).length || removedModules.length) {
-    log('[HMR]', 'Emitting updates');
-    socket.emit('new modules', {newModuleData: newModuleData, removedModules: removedModules});
-  }
-}
-function syncModules(chunkOnly) {
-  if (io && io.sockets && io.sockets.connected) {
-    _.each(io.sockets.connected, function(socket) {
-      emitNewModules(socket, cacheModuleData, chunkOnly)
-    })
-  }
-}
 var usedExternals = {}
-function getOpts(isGlobal, isHmr, chunkOnly) {
-  var opts = xtend(pkginfo.brocode || {}, { hmr: !!isHmr })
+function getOpts(isGlobal, chunkOnly) {
+  var opts = xtend(pkginfo.brocode || {})
   var globalLibs = cacheLibs
   if (!globalLibs) {
     globalLibs = []
@@ -224,90 +165,89 @@ function getOpts(isGlobal, isHmr, chunkOnly) {
     } catch (e) {}
     cacheLibs = globalLibs
   }
-  if (isGlobal) {
-    opts.global = true
-    opts.alterb = function (b) {
-      Object.keys(usedExternals).forEach(function (x) {
-        b.require(x, {expose: x})
-      })
-    }
-  } else {
-    opts.alterb = function (b) {
-      b.on('setNewModuleData', function(moduleData) {
-        _.assign(cacheModuleData, moduleData)
-        syncModules(chunkOnly)
-      })
-    }
-    /*
-    opts.externals = globalLibs.map(function (x) {
-      return x[1] || x[0]
-    }).filter(Boolean)
-    */
+  opts.global = true
+  opts.alterb = function (b) {
+    Object.keys(usedExternals).forEach(function (x) {
+      b.require(x, {expose: x})
+    })
   }
-  opts.args = xtend(args, {basedir: SRC_ROOT}, (!isGlobal && isHmr ? {plugin: [hmrPlugin]} : {}))
-  if (!isGlobal) {
-    opts.args.filter = function(id) {
-      if (typeof id === 'string' && id[0] !== '.' &&
-          (id.indexOf(SRC_ROOT) !== 0 || id.indexOf(path.join(SRC_ROOT, 'node_modules')) === 0 )) {
-        usedExternals[id] = 1
-        return false
-      }
-      return true
-    }
-  }
+  opts.args = xtend(args, {basedir: SRC_ROOT})
+  if (!isGlobal) 
   return opts
 }
+function exists(filePath) {
+  return new Promise((resolve) => fs.exists(filePath, (e) => resolve(e)))
+}
+var getGlobalBundle = (function () {
+  var cache
+  var lastExternals = []
+  return co(function * () {
+    if (!cache || !cache.isPending()) {
+      var start = Date.now()
+      var globalPath = path.join(SRC_ROOT, 'js', 'global.js')
+      var externals = yield getExternals()
+      if (cache && !_.xor(externals, lastExternals).length) {
+        return cache
+      }
+      lastExternals = externals
+      console.log('(re)generating global bundle at ' + start)
+      var globalExists = yield exists(globalPath)
+      const source = 'window.EXTERNALS = {}\n' + externals.map((external) =>
+        `EXTERNALS['${external}'] = require('${external}')\n`)
+      var b = browserify()
+      b.add(path.join(SRC_ROOT, 'js', 'externals.js'), {
+        source,
+      })
+      if (globalExists) {
+        b.add(globalPath)
+      }
+      cache = Promise.fromCallback(b.bundle.bind(b)).then((bundled) => {
+        console.log('global generated in ' + (Date.now() - start) + 'ms');
+        return bundled
+      })
+    }
+    return cache
+  })
+}())
+
 app.get(/.*\.js$/i, function (req, res, next) {
-  var isHmr = false
-  if (req.serverPort > app.port + 2) {
+  if (req.serverPort === app.port) {
     return next()
-  } else if (req.serverPort === app.port + 2) {
-    isHmr = true
   }
-  if (!(req.url === '/js/main.js' || req.url === '/global.js' || req.url.indexOf('/js/main/') > -1)) {
+  if (!(req.url === '/js/main.js' || req.url === '/js/global.js' || req.url.indexOf('/js/main/') > -1)) {
     return next()
   }
   var filePath = path.join(SRC_ROOT, req.url)
   var isGlobal = false
 
-  if (req.url === '/global.js') {
-    isGlobal = true
-    if (globalCache.b) {
+  if (req.url === '/js/global.js') {
+    globalCacheValid
+    .then(() => getGlobalBundle())
+    .then((b) => {
       res.type('js')
-      res.send(globalCache.b)
-      log('(bundle)', path.sep + path.relative(SRC_ROOT, filePath), `from cache`)
-      return
-    }
+      res.send(b.toString())
+    })
+    return
   }
-  var opts = getOpts(isGlobal, isHmr, false)
 
-  log('(bundle)', path.sep + path.relative(SRC_ROOT, filePath), `starting...`)
   var start = Date.now()
-
-  var b = (exists) => (exists
-                       ? bundle([filePath], [], opts).then(passForGood(filePath), handleError(filePath))
-                       : bundle([], [], opts)).then(passForGood(filePath), handleError(filePath)).then(b => {
-    log('(bundle)', path.sep + path.relative(SRC_ROOT, filePath), `${Date.now() - start}ms`)
-    if (isGlobal) {
-      globalCache.b = b
+  var cache = rollupCache[filePath]
+  if (!cache || !cache.isPending()) {
+    cache = rollupCache[filePath] = (cache || Promise.resolve({})).then((bundle) => rollup(filePath, bundle.imports, bundle))
+  }
+  cache.then(rollupResolved)
+  function rollupResolved(bundle) {
+    if (typeof globalCacheValid.resolve === 'function') {
+      globalCacheValid.resolve(true)
     }
+    log('(bundle)', path.sep + path.relative(SRC_ROOT, filePath), (Date.now() - start))
     res.type('js')
-    res.send(b)
-  })
-
-  if (isGlobal) {
-    fs.exists(filePath, b)
-  } else fs.exists(filePath, function (exists) {
-    if (!exists) {
-      next()
-      return
-    }
-    b(true)
-  })
+    res.send(bundle.code)
+  }
 })
 
 app.use(function (req, res, next) {
-  var sod = req.pathSOD = req.serverPort > app.port + 2 ? '/.dist' : '/src'
+  var sod = req.pathSOD = req.serverPort === app.port ? '/.dist' : '/src'
   req.url = sod + req.url
   log('[static]', req.url)
   next()
@@ -334,83 +274,52 @@ app.use(function (req, res, next) {
 })
 
 var browserSync
-var io
-Object.defineProperty(exports, 'io', {
-  get: function() {
-    return io
-  }
-})
+function getExternals() {
+  return Promise.all(_.values(rollupCache)).then((cached) =>
+    _(cached).map('imports').flatten().uniq().filter(e => e[0] !== '.').value())
+}
 
 exports.app = app
 exports.start = function (port) {
-  var mainFiles = globby.sync(['js/main.js', 'js/main.jsx', 'js/**/*.main.js', 'js/**/*.main.jsx'], {cwd: SRC_ROOT})
+  var mainFiles = globby.sync(['js/main.js', 'js/**/*.main.js'], {cwd: SRC_ROOT})
   co(function * () {
     var opts
     for (var main, i = -1; main = mainFiles[++i];) {
       console.log('pre-compiling ' + main + ' ...');
-      opts = getOpts(false, true, false)
-      yield bundle([path.join(SRC_ROOT, main)], [], opts)
+      opts = getOpts(false, false)
+      const filePath = path.join(SRC_ROOT, main)
+      rollupCache[filePath] = rollup(filePath)
     }
-    console.log('bundling global with auto-detected externals:\n  ' + Object.keys(usedExternals).join('\n  '));
-    var globalPath = path.join(SRC_ROOT, 'global.js')
-    var globalExists = fs.existsSync(globalPath)
-    var start = Date.now()
-    opts = getOpts(true, false, false)
-    globalCache.b = yield bundle((globalExists ? [globalPath] : []), [], opts)//.then(passForGood(filePath), handleError(filePath))
-    console.log('bundled global.js', `${Date.now() - start}ms`)
+    usedExternals = yield getExternals()
+    const source = 'window.EXTERNALS = {}\n' + usedExternals.map((external) =>
+      `EXTERNALS['${external}'] = require('${external}')\n`)
+
+    console.log('bundling global with auto-detected externals:\n  ' + usedExternals.join('\n  '));
+    var b = yield getGlobalBundle()
 
   })().then(function() {
 
-  console.log(mainFiles);
   port = port || 8000
   app.port = port
   var server = http.createServer(app)
   var distServer = http.createServer(app)
-  var hmrServer = http.createServer(app)
-  io = socketio(hmrServer)
-  io.on('connection', function(socket) {
-    function log() {
-      console.log.apply(console, [new Date().toTimeString(), '[HMR]'].concat(_.toArray(arguments)));
-    }
-    socket.on('sync', function(syncMsg) {
-      log('User connected, syncing');
-      var oldModuleData = _.pick(cacheModuleData, _.keys(syncMsg))
-      var mainScripts = _.keys(syncMsg).filter(function(name) {
-        return name.startsWith('js/main/') || name === 'js/main.js'
-      })
-      log('(sync)', mainScripts, 'starting...')
-      var start = Date.now()
-      ;(mainScripts.length
-      ? Promise.all(mainScripts.map((name) => path.join(SRC_ROOT, name)).map((p) => bundle([p], [], getOpts(false, true, false)).then(passForGood(p), handleError(p))))
-      : Promise.resolve([])).then(function (results) {
-        log('(sync)', mainScripts, `${Date.now() - start}ms`)
-        socket.moduleData = oldModuleData
-        socket.emit('sync confirm', null);
-        emitNewModules(socket, cacheModuleData, false)
-      });
-    });
-  });
 
-  server.listen(port, '0.0.0.0', function () {
+  server.listen(port + 1, '0.0.0.0', function () {
     console.log('development server listening at http://0.0.0.0:%d', this.address().port)
   })
 
   browserSync = require('browser-sync').create()
   // 使用 browser-sync
   browserSync.init({
-    proxy: 'localhost:' + port,
-    port: port + 1,
+    proxy: 'localhost:' + (port + 1),
+    port: port + 2,
     ui: false,
     open: false
   }, function() {
-    console.log('development server with browsersync listening at http://0.0.0.0:%d', port + 1)
+    console.log('development server with browsersync listening at http://0.0.0.0:%d', port + 2)
   })
 
-  hmrServer.listen(port + 2, '0.0.0.0', function () {
-    console.log('hot module reload server listening at http://0.0.0.0:%d, run `brocode build` to update', this.address().port)
-  })
-
-  distServer.listen(port + 3, '0.0.0.0', function () {
+  distServer.listen(port, '0.0.0.0', function () {
     console.log('production preview server listening at http://0.0.0.0:%d, run `brocode build` to update', this.address().port)
   })
 
