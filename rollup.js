@@ -1,9 +1,9 @@
 'use strict'
 
-var rollup = require( 'rollup' )
-var json = require( 'rollup-plugin-json' )
-var _ = require('lodash')
-var Promise = require('bluebird')
+const rollup = require('rollup')
+const json = require('rollup-plugin-json')
+const _ = require('lodash')
+const bluebird = require('bluebird')
 
 module.exports = function(filePath, external, cache) {
   const opts = _.assign(
@@ -14,7 +14,7 @@ module.exports = function(filePath, external, cache) {
     (external && external.length ? {external} : {}),
     (cache && typeof cache.generate === 'function' ? {cache} : {})
   )
-  return Promise.resolve(rollup.rollup(opts).then((bundle) => {
+  const bundle = rollup.rollup(opts).then((bundle) => {
     bundle.globals = _(bundle.imports)
       .map(im => [im, `EXTERNALS["${im}"]`])
       .fromPairs()
@@ -24,5 +24,6 @@ module.exports = function(filePath, external, cache) {
       globals: bundle.globals,
     }))
     return bundle
-  }))
+  })
+  return bluebird.resolve(bundle)
 }
