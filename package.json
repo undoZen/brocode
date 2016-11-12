@@ -1,6 +1,6 @@
 {
   "name": "brocode",
-  "version": "2.0.0-pre4",
+  "version": "2.0.0-pre5",
   "description": "A Bro doesn't allow another Bro to struggle with web packaging tools.",
   "main": "bundle.js",
   "jsnext:main": "src/index.js",
