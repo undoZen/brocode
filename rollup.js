@@ -21,6 +21,7 @@ module.exports = function(filePath, external, cache) {
       .value()
     _.assign(bundle, bundle.generate({
       format: 'iife',
+      moduleName: '_brocode_main',
       globals: bundle.globals,
     }))
     return bundle
